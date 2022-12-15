@@ -1,6 +1,5 @@
 library(gmRi)
 
-
 #load NFMS Trawl Survey
 clean_survey<-gmri_survdat_prep(
   survdat_source ="most recent",
@@ -24,19 +23,27 @@ summary(NECC_fishes)
 
 #center of latitude over time?
 
-dogfish_fall<- NECC_fishes %>%
+dogfish_fall<-NECC_fishes %>%
   filter(comname == "smooth dogfish") %>%
   filter(season == "Fall") %>%
-  mutate(weightedLat = weighted.mean(x = decdeg_beglat, w=biomass_kg)) %>%
-  mutate(weightedLon = weighted.mean(x= decdeg_beglon, w=biomass_kg))
+  group_by(est_year)%>%
+  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=biomass_kg), weightedLon=weighted.mean(x=decdeg_beglon, w=biomass_kg))
 
-ggplot() +
-  geom_point(data=dogfish_fall, aes(x=est_year, y=weightedLa, size=biomass_kg)) +
-  geom_abline()
-#okay? maybe review Lindsey trawl code
-##calc center of lat for time series?
+ggplot(aes(x=est_year, y=weightedLat))+
+  geom_point()+
+  geom_smooth(method="lm")
 
+#more center of lat practice
+NECC_fishes%>%
+  filter(comname == "atlantic cod") %>%
+  filter(season == "Fall") %>%
+  group_by(est_year)%>%
+  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=biomass_kg), weightedLon=weighted.mean(x=decdeg_beglon, w=biomass_kg)) %>%
+  ggplot(aes(x=est_year, y=weightedLat))+
+  geom_point()+
+  geom_smooth(method="lm")
 
+#review linear regression models
 
 
 
