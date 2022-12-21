@@ -107,7 +107,46 @@ All_spp_lat<-All_spp_lat%>%
   mutate(
     tidy=map(mod,broom::tidy),
     glance=map(mod,broom::glance),
+    rsq=glance%>%map_dbl("r.squared"),
     augment=map(mod,broom::augment)
   )
-  
 
+##unnest to plot by season & species
+#subset by season, plot each species over time 
+
+#Fall plots
+All_spp_lat%>%
+  unnest(data)%>%
+  select(comname, season, est_year, weightedLat)%>%
+  filter(season == "Fall")%>%
+  ggplot(aes(est_year, weightedLat))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  facet_wrap(~season+comname)
+  
+#Spring plots
+All_spp_lat%>%
+  unnest(data)%>%
+  select(comname, season, est_year, weightedLat)%>%
+  filter(season == "Spring")%>%
+  ggplot(aes(est_year, weightedLat))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  facet_wrap(~season+comname)
+
+##loop to generate individual plots
+library(gridExtra)
+plotlist<-list()
+
+for(i in length(All_spp_lat)){
+  loop_df<-All_spp_lat%>%
+    unnest(data)%>%
+    select(comname, season, est_year, weightedLat)%>%
+    group_by(comname)
+  
+plotlist[[i]]<-ggplot(loop_df,aes(est_year, weightedLat))+geom_point()+geom_smooth(method='lm')
+    
+}
+
+list1 = plotlist[c(1:8)]
+do.call(grid.arrange,c(list1, ncol = 4))
