@@ -1,5 +1,5 @@
 library(gmRi)
-
+library(dplyr)
 #load NFMS Trawl Survey
 
 clean_survey<-gmri_survdat_prep(
@@ -18,7 +18,7 @@ head(NECC)
 
 #Filter trawl by species
 NECC_fishes<-clean_survey %>% 
-  select("comname", "est_year", "biomass_kg", "decdeg_beglat",  "decdeg_beglon", "season", "survey_area") %>%
+  select("comname", "est_year", "biomass_kg", "decdeg_beglat",  "decdeg_beglon", "season") %>%
   filter(comname %in% NECC)
 summary(NECC_fishes)
 
@@ -45,7 +45,7 @@ NECC_fishes%>%
   geom_point()+
   geom_smooth(method="lm") 
 
-#center of lat for all species
+#center of lat/lon for all species
 
 All_spp_lat<-NECC_fishes %>%
   group_by(comname, est_year, season)%>%
@@ -111,6 +111,10 @@ All_spp_lat<-All_spp_lat%>%
     augment=map(mod,broom::augment)
   )
 
+#extract slope
+All_spp_lat<-All_spp_lat%>%
+  mutate(slope=tidy%>%map_dbl("est_year"))
+
 ##unnest to plot by season & species
 #subset by season, plot each species over time 
 
@@ -150,3 +154,30 @@ plotlist[[i]]<-ggplot(loop_df,aes(est_year, weightedLat))+geom_point()+geom_smoo
 
 list1 = plotlist[c(1:8)]
 do.call(grid.arrange,c(list1, ncol = 4))
+
+##edits post restructuring...
+#new functions
+species_lat_mod<-function(df){
+  lm(weightedLat~est_year, data=df)
+}
+
+species_lon_mod<-function(df){
+  lm(weightedLon~est_year, data=df)
+}
+species_biomass_mod<-function(df){
+  lm(biomass_kg~est_year, data=df)
+}
+
+#center of gravity loopz
+library(here)
+source(here("R", "helper_funcs.R"))
+
+test<-NECC_fishes %>%
+  group_by(comname, est_year, season)%>%
+  nest()
+ 
+CofGravity<-test%>%
+  unnest(data)%>%
+  summarise(cog=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
+  group_by(comname, est_year, season)%>%
+  nest() 
