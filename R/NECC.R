@@ -111,10 +111,7 @@ All_spp_lat<-All_spp_lat%>%
     augment=map(mod,broom::augment)
   )
 
-#extract slope
-All_spp_lat<-All_spp_lat%>%
-  mutate(slope=tidy%>%map_dbl("est_year"))
-
+#extract slope (tbd)
 ##unnest to plot by season & species
 #subset by season, plot each species over time 
 
@@ -138,7 +135,7 @@ All_spp_lat%>%
   geom_smooth(method = "lm")+
   facet_wrap(~season+comname)
 
-##loop to generate individual plots
+##loop to generate individual plots (incomplete)
 library(gridExtra)
 plotlist<-list()
 
@@ -155,7 +152,6 @@ plotlist[[i]]<-ggplot(loop_df,aes(est_year, weightedLat))+geom_point()+geom_smoo
 list1 = plotlist[c(1:8)]
 do.call(grid.arrange,c(list1, ncol = 4))
 
-##edits post restructuring...
 #new functions
 species_lat_mod<-function(df){
   lm(weightedLat~est_year, data=df)
@@ -168,16 +164,35 @@ species_biomass_mod<-function(df){
   lm(biomass_kg~est_year, data=df)
 }
 
+
 #center of gravity loopz
 library(here)
 source(here("R", "helper_funcs.R"))
+#create some points
+x = seq(154,110,length=25) # your longitudes
+y = seq(-10,-54,length=25) # your latitudes
+z = NULL
+wt = runif(25) # your biomasses
+#calculate the Centre of Gravity for these points
 
-test<-NECC_fishes %>%
-  group_by(comname, est_year, season)%>%
-  nest()
- 
-CofGravity<-test%>%
-  unnest(data)%>%
-  summarise(cog=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
-  group_by(comname, est_year, season)%>%
-  nest() 
+test<-NECC_fishes%>%
+  group_by(comname,est_year,season)%>%
+  summarise(COG=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
+  unnest_longer(COG)%>%
+  pivot_wider(names_from=COG_id, values_from = COG)%>%
+  select("comname","est_year", "season", "COGx", "COGy")%>%
+  relocate(COGx, .after=COGy)
+
+test<- test%>%
+  group_by(comname, season)%>%
+  left_join(unique(All_species%>%
+           select("weightedLat", "weightedLon")))
+
+#center of gravity fp
+cog_mapped<- function(df) {
+  COGravity(x=df$decdeg_beglon, y=df$decdeg_beglat, z=NULL, wt=df$biomass_kg)
+}
+
+
+  
+
