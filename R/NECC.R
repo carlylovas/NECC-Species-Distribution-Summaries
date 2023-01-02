@@ -154,16 +154,20 @@ do.call(grid.arrange,c(list1, ncol = 4))
 
 #new functions
 species_lat_mod<-function(df){
-  lm(weightedLat~est_year, data=df)
+  lm(COGy~est_year, data=df)
 }
 
 species_lon_mod<-function(df){
-  lm(weightedLon~est_year, data=df)
+  lm(COGx~est_year, data=df)
 }
+
 species_biomass_mod<-function(df){
   lm(biomass_kg~est_year, data=df)
 }
 
+cog_mapped<- function(df) {
+  COGravity(x=df$decdeg_beglon, y=df$decdeg_beglat, z=NULL, wt=df$biomass_kg)
+}
 
 #center of gravity loopz
 library(here)
@@ -188,11 +192,48 @@ test<- test%>%
   left_join(unique(All_species%>%
            select("weightedLat", "weightedLon")))
 
-#center of gravity fp
-cog_mapped<- function(df) {
-  COGravity(x=df$decdeg_beglon, y=df$decdeg_beglat, z=NULL, wt=df$biomass_kg)
-}
+write.csv(test,"~\\Data\\Center of Gravity.csv", row.names=TRUE)
 
+##linear models, COG
+nestedData<-test%>%
+  group_by(comname, season)%>%
+  nest()
 
-  
+nestedData<-nestedData%>%
+  mutate(centerLat=map(data, species_lat_mod))%>%
+  mutate(centerLon=map(data, species_lon_mod))%>%
+  group_by(season)
+
+##fall plots
+nestedData%>%
+  unnest(data)%>%
+  select(comname, season, est_year, COGy)%>%
+  filter(season == "Fall")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("1970-2019")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Fall Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname)
+
+##spring plots
+nestedData%>%
+  unnest(data)%>%
+  select(comname, season, est_year, COGy)%>%
+  filter(season == "Spring")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("1970-2019")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Spring Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname)
+
 
