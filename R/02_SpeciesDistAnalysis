@@ -1,0 +1,116 @@
+#####
+## Summarizing species distribution changes in space and time
+#####
+
+## Libraries and other necessities
+library(here)
+library(tidyverse)
+
+# Make sure gmRi package is up to date!!
+devtools::install_github("https://github.com/gulfofmaine/gmRi")
+library(gmRi)
+
+## Start work
+
+# load the necc_fishes data, which we created using the O1_SurveyDataPrep.R function
+necc_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
+
+## Single species-season examples
+# center of latitude over time?
+
+dogfish_fall <- necc_fishes %>%
+    filter(comname == "smooth dogfish") %>%
+    filter(season == "Fall") %>%
+    group_by(est_year) %>%
+    summarize(
+        weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg),
+        weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)
+    )
+
+ggplot(data = dogfish_fall, aes(x=est_year, y=weightedLat))+
+  geom_point()+
+  geom_smooth(method="lm")
+
+# more center of lat practice
+necc_fishes %>%
+    filter(comname == "atlantic cod") %>%
+    filter(season == "Fall") %>%
+    group_by(est_year) %>%
+    summarize(weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg), weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)) %>%
+    ggplot(aes(x = est_year, y = weightedLat)) +
+    geom_point() +
+    geom_smooth(method = "lm")
+
+
+## All species and seasons -- AWESOME!!!
+All_spp_lat_lon <- necc_fishes %>%
+    group_by(comname, est_year, season) %>%
+    summarize(
+        weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg),
+        weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)
+    )
+
+  
+
+#review linear regression models
+
+dog_lm<-lm(weightedLat~est_year, dogfish_fall)
+summary(dog_lm)
+
+necc_fishes %>%
+    filter(comname == "atlantic cod") %>%
+    filter(season == "Fall") %>%
+    group_by(est_year) %>%
+    summarize(weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg), weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)) %>%
+    ggplot(aes(x = est_year, y = weightedLat)) +
+    geom_point() +
+    geom_smooth(method = "lm")
+
+
+necc_fishes%>%
+  filter(comname == "atlantic cod") %>%
+  filter(season == "Spring") %>%
+  group_by(est_year)%>%
+  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=sum_biomass_kg), weightedLon=weighted.mean(x=decdeg_beglon, w=sum_biomass_kg)) %>%
+  ggplot(aes(x=est_year, y=weightedLat))+
+  geom_point()+
+  geom_smooth(method="lm") 
+
+All_spp_lat %>%
+  filter(comname =="alewife", season == "Fall")%>%
+  ggplot(aes(x=est_year, y=weightedLat)) +
+  geom_point()+
+  geom_smooth(method="lm")
+
+##functions & looping
+library(tidyverse)
+library(tidyr)
+
+All_spp_lat_lon<-necc_fishes %>%
+  group_by(comname, season, est_year)%>%
+  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=sum_biomass_kg), 
+            weightedLon=weighted.mean(x=decdeg_beglon, w=sum_biomass_kg))%>%
+  nest() # Nice!!
+
+All_spp_lat_lon$data[[1]]
+
+# Fantastic!!
+species_mod<-function(df){
+    ## AA note: this isn't always neceessary, though as functions get more complex, it can be good practice to get in the habit of being explicit about what the function returns.
+    lm_mod <- lm(weightedLat ~ est_year, data = df)
+    return(lm_mod)
+}
+
+All_spp_lat_lon<-All_spp_lat_lon %>%
+  mutate(mod=map(data, possibly(species_mod, NA)))%>%
+  group_by(season)
+
+#extract lm outputs
+All_spp_lat_lon<-All_spp_lat_lon%>%
+  mutate(
+    tidy=map(mod, possibly(broom::tidy, NA)),
+    glance=map(mod, possibly(broom::glance, NA)),
+    augment = map(mod, possibly(broom::augment, NA))
+  )
+  
+

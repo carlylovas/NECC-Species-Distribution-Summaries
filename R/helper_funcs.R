@@ -77,9 +77,3 @@ COGravity <- function(x,y=NULL,z=NULL,wt=NULL) {
     y <- yll + c(0:(nc - 1)) * cs
     return(list(x = x, y = y))
 }
-
-
-test <- NECC_fishes %>%
-    group_by(comname, est_year, season) %>%
-    summarise(COG = GOGravity(x = decdeg_beglon, y = decdeg_beglat, z = NULL, wt = biomass_kg)) %>%
-    unnest_wider(COG)
