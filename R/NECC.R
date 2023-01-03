@@ -1,3 +1,4 @@
+install.packages("gmRi")
 library(gmRi)
 library(dplyr)
 #load NFMS Trawl Survey
@@ -236,4 +237,44 @@ nestedData%>%
     axis.ticks = element_blank())+
   facet_wrap(~comname)
 
+##center of gravity without season
+COG_wo_season<-NECC_fishes%>%
+  group_by(comname,est_year)%>%
+  summarise(COG=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
+  unnest_longer(COG)%>%
+  pivot_wider(names_from=COG_id, values_from = COG)%>%
+  select("comname","est_year", "COGx", "COGy")%>%
+  relocate(COGx, .after=COGy)
 
+COG_wo_season<-COG_wo_season%>%
+  group_by(comname)%>%
+  nest()%>%
+  mutate(centerLat=map(data, species_lat_mod))%>%
+  mutate(centerLon=map(data, species_lon_mod))
+
+#center of gravity with season
+COG_w_season<-nestedData
+
+##extract coefficients from nested models
+COG_wo_season<-COG_wo_season%>%
+  mutate(tidyLat=map(centerLat,broom::tidy),
+         tidyLon=map(centerLon,broom::tidy),
+         coefLat=tidyLat%>%map("estimate"),
+         coefLon=tidyLon%>%map("estimate"))
+
+COG_w_season<-COG_w_season%>%
+  mutate(tidyLat=map(centerLat,broom::tidy),
+         tidyLon=map(centerLon,broom::tidy),
+         coefLat=tidyLat%>%map("estimate"),
+         coefLon=tidyLon%>%map("estimate"))
+
+##tidy dataset (change in lat only)
+clean_w_season<-COG_w_season%>%
+  unnest(data)%>%
+  select("comname","est_year","season","COGy","COGx","coefLat") #tried unnest_longer() and separate()
+
+tidyData<-COG_wo_season%>%
+  unnest_wider(tidyLat)%>%
+  select("comname","estimate")
+
+str(tidyData)
