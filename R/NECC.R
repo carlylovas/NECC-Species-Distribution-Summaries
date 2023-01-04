@@ -181,7 +181,10 @@ for (i in length(All_spp_lat)) {
     geom_smooth(method = "lm")
 }
 
-# AA again: We can also see this in the `plotlist` object as only the 9th element is populated. For why this is happening, the "for" bit is saying "for i in 9" and we want it to say something like "for i in 1, 2, 3, 4, 5, 6, 7, 8, 9." To get that, we could write `for(i in 1:length(All_spp_lat)` and confirm that works by typing `1:length(All_spp_lat)` in the console. 
+# AA again: We can also see this in the `plotlist` object as only the 9th element is populated. 
+##For why this is happening, the "for" bit is saying "for i in 9" and we want it to say something like "for i in 1, 2, 3, 4, 5, 6, 7, 8, 9." 
+###To get that, we could write `for(i in 1:length(All_spp_lat)` and confirm that works by typing `1:length(All_spp_lat)` in the console. 
+
 1:length(All_spp_lat)
 for (i in 1:length(All_spp_lat)) {
   print(i)
@@ -198,7 +201,12 @@ for (i in 1:length(All_spp_lat)) {
 list1 = plotlist[c(1:8)]
 do.call(grid.arrange, c(list1, ncol = 4))
 
-# AA again: That gets us the plots, though I am guessing it is pretty clear that they are all identical. I'm not entirely sure what this loop is for, though let's say we wanted to do this to get a plot for each species/season, with 2 species per layout? The first thing we would want to change is that we want to loop over rows and not the columns in `All_spp_lat`. We are also going to want to set up the plotlist storage ahead of time just to help with speed. A bunch of ways to do this, here's one option:
+# AA again: That gets us the plots, though I am guessing it is pretty clear that they are all identical. 
+##I'm not entirely sure what this loop is for, though let's say we wanted to do this to get a plot for each species/season, with 2 species per layout? 
+###The first thing we would want to change is that we want to loop over rows and not the columns in `All_spp_lat`. 
+##We are also going to want to set up the plotlist storage ahead of time just to help with speed. 
+#A bunch of ways to do this, here's one option:
+
 n_spp_seas <- nrow(All_spp_lat)
 plotlist <- vector("list", length = n_spp_seas)
 names(plotlist) <- paste(All_spp_lat$comname, All_spp_lat$season, sep = "_")
@@ -337,22 +345,26 @@ COG_w_season<-nestedData
 COG_wo_season<-COG_wo_season%>%
   mutate(tidyLat=map(centerLat,broom::tidy),
          tidyLon=map(centerLon,broom::tidy),
-         coefLat=tidyLat%>%map("estimate"),
-         coefLon=tidyLon%>%map("estimate"))
+         slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
 
 COG_w_season<-COG_w_season%>%
   mutate(tidyLat=map(centerLat,broom::tidy),
          tidyLon=map(centerLon,broom::tidy),
-         coefLat=tidyLat%>%map("estimate"),
-         coefLon=tidyLon%>%map("estimate"))
+         slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
 
-##tidy dataset (change in lat only)
+##tidy dataset 
 clean_w_season<-COG_w_season%>%
   unnest(data)%>%
-  select("comname","est_year","season","COGy","COGx","coefLat") #tried unnest_longer() and separate()
+  select("comname","est_year","season","COGy","COGx","slopeLat", "slopeLon")%>%
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+         "Common Name"="comname", "Year"="est_year", "Season"="season")
+write.csv(clean_w_season, "withSeason.csv", row.names = FALSE)
 
-tidyData<-COG_wo_season%>%
-  unnest_wider(tidyLat)%>%
-  select("comname","estimate")
-
-str(tidyData)
+clean_wo_season<-COG_wo_season%>%
+  unnest(data)%>%
+  select("comname","est_year","COGy","COGx","slopeLat", "slopeLon")%>%
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+         "Common Name"="comname", "Year"="est_year")
+write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
