@@ -358,13 +358,41 @@ COG_w_season<-COG_w_season%>%
 clean_w_season<-COG_w_season%>%
   unnest(data)%>%
   select("comname","est_year","season","COGy","COGx","slopeLat", "slopeLon")%>%
-  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
-         "Common Name"="comname", "Year"="est_year", "Season"="season")
+  distinct()
+
+##add this line later
+# rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon","Common Name"="comname", "Year"="est_year", "Season"="season")
 write.csv(clean_w_season, "withSeason.csv", row.names = FALSE)
 
 clean_wo_season<-COG_wo_season%>%
   unnest(data)%>%
   select("comname","est_year","COGy","COGx","slopeLat", "slopeLon")%>%
   rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
-         "Common Name"="comname", "Year"="est_year")
+         "Common Name"="comname", "Year"="est_year")%>%
+  distinct()
+
 write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
+
+
+##what is happening with tautog (Kathy asked)
+tautog<-NECC_fishes%>%
+  filter(comname == "tautog")
+tautog_cog<-clean_w_season%>%
+  filter(`Common Name`=="tautog",
+         Season == "Fall")
+
+##calc distance between seasons
+install.packages(c("sf", "geodist", "geosphere"))
+library(sf)
+library(geodist)
+library(geosphere)
+
+geoTest<-clean_w_season%>%
+  select(comname, season, est_year, COGy, COGx)%>%
+  pivot_wider(names_from=season, values_from = c(COGx, COGy))%>%
+  unite(COGx_Spring, COGy_Spring, col="Spring",sep=",")%>%
+  unite(COGx_Fall, COGy_Fall, col="Fall",sep=",")%>%
+  group_by(comname,est_year)%>%
+  nest()
+
+###uhhhhhh now what...
