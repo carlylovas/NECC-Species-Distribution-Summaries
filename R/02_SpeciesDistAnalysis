@@ -5,6 +5,10 @@
 ## Libraries and other necessities
 library(here)
 library(tidyverse)
+library(sf)
+
+## Center of Gravity from SDMTools: https://rdrr.io/cran/SDMTools/src/R/COGravity.R
+source(here("R", "helper_funcs.R"))
 
 # Make sure gmRi package is up to date!!
 devtools::install_github("https://github.com/gulfofmaine/gmRi")
@@ -15,102 +19,128 @@ library(gmRi)
 # load the necc_fishes data, which we created using the O1_SurveyDataPrep.R function
 necc_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
 
-## Single species-season examples
-# center of latitude over time?
+####Calculate Center of Gravity
+##linear model functions to map over nested data
 
-dogfish_fall <- necc_fishes %>%
-    filter(comname == "smooth dogfish") %>%
-    filter(season == "Fall") %>%
-    group_by(est_year) %>%
-    summarize(
-        weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg),
-        weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)
-    )
-
-ggplot(data = dogfish_fall, aes(x=est_year, y=weightedLat))+
-  geom_point()+
-  geom_smooth(method="lm")
-
-# more center of lat practice
-necc_fishes %>%
-    filter(comname == "atlantic cod") %>%
-    filter(season == "Fall") %>%
-    group_by(est_year) %>%
-    summarize(weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg), weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)) %>%
-    ggplot(aes(x = est_year, y = weightedLat)) +
-    geom_point() +
-    geom_smooth(method = "lm")
-
-
-## All species and seasons -- AWESOME!!!
-All_spp_lat_lon <- necc_fishes %>%
-    group_by(comname, est_year, season) %>%
-    summarize(
-        weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg),
-        weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)
-    )
-
-  
-
-#review linear regression models
-
-dog_lm<-lm(weightedLat~est_year, dogfish_fall)
-summary(dog_lm)
-
-necc_fishes %>%
-    filter(comname == "atlantic cod") %>%
-    filter(season == "Fall") %>%
-    group_by(est_year) %>%
-    summarize(weightedLat = weighted.mean(x = decdeg_beglat, w = sum_biomass_kg), weightedLon = weighted.mean(x = decdeg_beglon, w = sum_biomass_kg)) %>%
-    ggplot(aes(x = est_year, y = weightedLat)) +
-    geom_point() +
-    geom_smooth(method = "lm")
-
-
-necc_fishes%>%
-  filter(comname == "atlantic cod") %>%
-  filter(season == "Spring") %>%
-  group_by(est_year)%>%
-  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=sum_biomass_kg), weightedLon=weighted.mean(x=decdeg_beglon, w=sum_biomass_kg)) %>%
-  ggplot(aes(x=est_year, y=weightedLat))+
-  geom_point()+
-  geom_smooth(method="lm") 
-
-All_spp_lat %>%
-  filter(comname =="alewife", season == "Fall")%>%
-  ggplot(aes(x=est_year, y=weightedLat)) +
-  geom_point()+
-  geom_smooth(method="lm")
-
-##functions & looping
-library(tidyverse)
-library(tidyr)
-
-All_spp_lat_lon<-necc_fishes %>%
-  group_by(comname, season, est_year)%>%
-  summarize(weightedLat=weighted.mean(x=decdeg_beglat, w=sum_biomass_kg), 
-            weightedLon=weighted.mean(x=decdeg_beglon, w=sum_biomass_kg))%>%
-  nest() # Nice!!
-
-All_spp_lat_lon$data[[1]]
-
-# Fantastic!!
-species_mod<-function(df){
-    ## AA note: this isn't always neceessary, though as functions get more complex, it can be good practice to get in the habit of being explicit about what the function returns.
-    lm_mod <- lm(weightedLat ~ est_year, data = df)
-    return(lm_mod)
+species_lat_mod<-function(df){
+  lm(COGy~est_year, data=df)
 }
 
-All_spp_lat_lon<-All_spp_lat_lon %>%
-  mutate(mod=map(data, possibly(species_mod, NA)))%>%
-  group_by(season)
+species_lon_mod<-function(df){
+  lm(COGx~est_year, data=df)
+}
 
-#extract lm outputs
-All_spp_lat_lon<-All_spp_lat_lon%>%
-  mutate(
-    tidy=map(mod, possibly(broom::tidy, NA)),
-    glance=map(mod, possibly(broom::glance, NA)),
-    augment = map(mod, possibly(broom::augment, NA))
-  )
+#Center of Gravity with season
+COG_w_season<- NECC_fishes%>%
+  group_by(comname,est_year,season)%>%
+  summarise(COG=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
+  unnest_longer(COG)%>%
+  pivot_wider(names_from=COG_id, values_from = COG)%>%
+  select("comname","est_year", "season", "COGx", "COGy")%>%
+  relocate(COGx, .after=COGy)
+
+COG_w_season<-COG_w_season%>%
+  group_by(comname, season)%>%
+  nest()%>%
+  mutate(centerLat=map(data, species_lat_mod))%>%
+  mutate(centerLon=map(data, species_lon_mod))
+
+#Center of Gravity without season
+COG_wo_season<-NECC_fishes%>%
+  group_by(comname,est_year)%>%
+  summarise(COG=COGravity(x=decdeg_beglon, y=decdeg_beglat, z=NULL, wt=biomass_kg))%>%
+  unnest_longer(COG)%>%
+  pivot_wider(names_from=COG_id, values_from = COG)%>%
+  select("comname","est_year", "COGx", "COGy")%>%
+  relocate(COGx, .after=COGy)
+
+COG_wo_season<-COG_wo_season%>%
+  group_by(comname)%>%
+  nest()%>%
+  mutate(centerLat=map(data, species_lat_mod))%>%
+  mutate(centerLon=map(data, species_lon_mod))
+
+##extract coefficients from nested models
+COG_wo_season<-COG_wo_season%>%
+  mutate(tidyLat=map(centerLat,broom::tidy),
+         tidyLon=map(centerLon,broom::tidy),
+         slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
+
+COG_w_season<-COG_w_season%>%
+  mutate(tidyLat=map(centerLat,broom::tidy),
+         tidyLon=map(centerLon,broom::tidy),
+         slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
+         
+##tidy datasets 
+clean_w_season<-COG_w_season%>%
+  unnest(data)%>%
+  select("comname","est_year","season","COGy","COGx","slopeLat", "slopeLon")%>%
+  distinct()
   
+clean_wo_season<-COG_wo_season%>%
+  unnest(data)%>%
+  select("comname","est_year","COGy","COGx","slopeLat", "slopeLon")%>%
+  distinct()
+  
+####Calculate seasonal distance
+season_dist<-clean_w_season%>%
+  select(comname, season, est_year, COGx, COGy)%>%
+  group_by(comname, est_year)%>%
+  nest()
+  
+point_dist<-function(df){
+  if(FALSE){
+    df<-season_dist$data[[201]]
+  }
+  temp<-st_as_sf(df,coords=c("COGx","COGy"), crs=4326, remove=FALSE)
+  out<-st_distance(temp)[1,2]
+  return(out)
+}
+
+season_dist<-season_dist%>%
+  mutate(dist=map_dbl(data,possibly(point_dist, NA)))
+
+season_dist<-season_dist%>%
+  select(comname, est_year, dist)%>%
+  group_by(comname)%>%
+  nest()
+
+#map linear model (distance ~ year)
+
+dist_mod<-function(df){
+  temp<-df%>%
+    drop_na(dist)
+  lm(dist~est_year, data=temp)
+}
+dist_count<-function(df){
+  temp<-df%>%
+    drop_na()%>%
+    nrow()
+}
+slope<-function(x) x$estimate[2]
+
+season_dist<-season_dist%>%
+  mutate(mod=map(data, possibly(dist_mod, NA)),
+         num_obs=map(data, possibly(dist_count, NA)),
+         tidy=map(mod, possibly(broom::tidy, NA)),
+         slope=map(tidy, possibly(slope, NA)))
+
+####clean and write csv files
+library(MASS)
+
+clean_w_season<-clean_w_season%>%
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+        "Common Name"="comname", "Year"="est_year", "Season"="season")
+write.csv(clean_w_season, "withSeason.csv", row.names = FALSE)
+
+clean_wo_season<-COG_wo_season%>%
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+         "Common Name"="comname", "Year"="est_year")
+write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
+
+season_dist<-season_dist%>%
+  select(comname, num_obs, slope)
+write.matrix(season_dist, "seasonal distance.csv", sep=',')
 
