@@ -390,9 +390,86 @@ library(geosphere)
 geoTest<-clean_w_season%>%
   select(comname, season, est_year, COGy, COGx)%>%
   pivot_wider(names_from=season, values_from = c(COGx, COGy))%>%
-  unite(COGx_Spring, COGy_Spring, col="Spring",sep=",")%>%
-  unite(COGx_Fall, COGy_Fall, col="Fall",sep=",")%>%
+  unite(COGx_Spring, COGy_Spring, col="Spring",sep=",")%>%    ##doesn't work
+  unite(COGx_Fall, COGy_Fall, col="Fall",sep=",")%>% 
   group_by(comname,est_year)%>%
   nest()
 
-###uhhhhhh now what...
+##cleaner, nested geo data
+geoTest<-clean_w_season%>%
+  select(comname, season, est_year, COGx, COGy)%>%
+  group_by(comname, est_year)%>%
+  nest()
+
+#test single species
+alewife_geoTest<-clean_w_season%>%
+  filter(comname == "alewife",
+         est_year == "1970")
+
+alewife_geoTest<-alewife_geoTest%>%
+mutate(lat_long=st_as_sf(coords=c("COGx", "COGy"),crs=4326,remove=FALSE)) #nope
+
+alewife_geoTest<-st_as_sf(alewife_geoTest, coords=c("COGx", "COGy"), crs=4326, remove=FALSE)
+st_distance(alewife_geoTest$geometry[1], alewife_geoTest$geometry[2])
+##hmmmmmmmmmmm that did something...?
+
+#try st_as_sf on tibble
+geoTest2<-clean_w_season%>%
+  select(comname, season,est_year,COGx, COGy)
+geoTest2<-st_as_sf(geoTest2, coords=c("COGx","COGy"), crs=4326, remove=FALSE) #eh
+
+geoTest2<-as_tibble(geoTest2)
+geoTest2<-geoTest2%>%
+  pivot_wider(names_from=season, values_from=geometry) #nope
+
+#attempting to make functions to map over nested data
+join<-function(df){
+  st_join(x=c(df$COGx, df$COGy))
+}
+dist_fun<-function(df){
+  distm(df$Spring, df$Fall, fun=distGeo)
+}
+
+point_dist<-function(df){
+  if(FALSE){
+    df<-geoTest$data[[201]]
+  }
+  temp<-st_as_sf(df,coords=c("COGx","COGy"), crs=4326, remove=FALSE)
+  out<-st_distance(temp)[1,2]
+  return(out)
+}
+
+geoTest<-geoTest%>%
+  mutate(dist=map_dbl(data,possibly(point_dist, NA)))
+
+geoTest<-geoTest%>%
+  select(comname, est_year, dist)%>%
+  group_by(comname)%>%
+  nest()
+
+#map lm(est_year~dist)
+dist_mod<-function(df){
+  temp<-df%>%
+    drop_na(dist)
+  lm(dist~est_year, data=temp)
+}
+dist_count<-function(df){
+  temp<-df%>%
+    drop_na()%>%
+    nrow()
+}
+
+slope<-function(x) x$estimate[2]
+
+geoTest<-geoTest%>%
+  mutate(mod=map(data, possibly(dist_mod, NA)),
+         num_obs=map(data, possibly(dist_count, NA)),
+         tidy=map(mod, possibly(broom::tidy, NA)),
+         slope=map(tidy, possibly(slope, NA))) ##yayyyyyyyy
+
+#cleaned file
+season_dist<-geoTest%>%
+  select(comname, num_obs, slope)
+
+library(MASS)
+write.matrix(season_dist, "seasonal distance.csv", sep=',')
