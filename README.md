@@ -26,3 +26,6 @@ There are two subfolders: Plot_maps and Tables. These folders contain output res
          
          (3) seasonal_distance.csv (name subject to change)
                       This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (lat and long) per species and the recorded number of observations. 
+
+
+These folders and their contents are subject to change. 
