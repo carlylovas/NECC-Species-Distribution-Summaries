@@ -366,17 +366,31 @@ write.csv(clean_w_season, "withSeason.csv", row.names = FALSE)
 
 clean_wo_season<-COG_wo_season%>%
   unnest(data)%>%
-  select("comname","est_year","COGy","COGx","slopeLat", "slopeLon")%>%
-  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
-         "Common Name"="comname", "Year"="est_year")%>%
+  select("comname","est_year","COGy","COGx","slopeLat","slopeLon")%>%
   distinct()
 
 write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
 
 
-##what is happening with tautog (Kathy asked)
+##what is happening with tautog/croaker/weakfish/sharpnose (Kathy asked)
 tautog<-NECC_fishes%>%
   filter(comname == "tautog")
+
+weakfish<-NECC_fishes%>%
+  filter(comname=="weakfish")%>%
+  group_by(est_year)%>%
+  distinct()
+
+croaker<-NECC_fishes%>%
+  filter(comname=="atlantic croaker")%>%
+  group_by(est_year)
+
+sharpnose<-NECC_fishes%>%
+  filter(comname=="atlantic sharpnose shark")%>%
+  group_by(est_year)
+
+write.csv(tautog, "tautog.csv", row.names=FALSE)
+
 tautog_cog<-clean_w_season%>%
   filter(`Common Name`=="tautog",
          Season == "Fall")
@@ -473,3 +487,92 @@ season_dist<-geoTest%>%
 
 library(MASS)
 write.matrix(season_dist, "seasonal distance.csv", sep=',')
+
+
+####pre and post 2010
+pre2010<-clean_w_season%>%
+  filter(est_year<2009)
+
+post2010<-clean_w_season%>%
+  filter(est_year>2009)
+
+
+####plots 
+plot_fun<-function(df){
+  temp<-df%>%
+    select(comname, season, est_year, COGy)
+  out<-ggplot(temp, aes(est_year, COGy)+
+                geom_point()+
+                geom_smooth(method="lm"))
+  print(out)
+}
+
+##pre2010
+pre2010%>%
+  filter(season == "Fall")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("1970-2009")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Fall Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname)
+
+pre2010%>%
+  filter(season == "Spring")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("1970-2009")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Spring Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname, scales = "free_y") ###andrew suggestion
+
+
+##post2010
+post2010%>%
+  filter(season == "Fall")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("2010-2019")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Fall Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname)
+
+post2010%>%
+  filter(season == "Spring")%>%
+  ggplot(aes(est_year, COGy))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  xlab("2010-2019")+
+  ylab("Center of Latitude")+ 
+  ggtitle("Spring Trends")+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank())+
+  facet_wrap(~comname)
+
+
+####MAPS####
+maps<-clean_w_season%>%
+  select(comname, season, est_year, COGx, COGy)%>%
+  unite(COGx, COGy, col="coords",sep=",")
+
+clean_wo_season%>%
+  filter(comname == "acadian redfish")%>%
+  ggplot(aes(COGx, COGy))+
+  geom_point()+
+  geom_density_2d()+
+  xlab("Latitude")+
+  ylab("Longitude")+
+  ggtitle("acadian redfish")
