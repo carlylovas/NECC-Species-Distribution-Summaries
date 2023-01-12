@@ -15,7 +15,7 @@ There are two subfolders: Plot_maps and Tables. These folders contain output res
          
          
          (1) NEFSC_YearSeasonDistributionSummaries.csv
-                      This table contains the year-season center of latitude and longitude per species. Additionally, there are two columns including the                         rate of change associated with the center of latitude and center of longitude, respectively. 
+                      This table contains the year-season center of latitude and longitude per species. Additionally, there are two columns including rate of change associated with the center of latitude and center of longitude, respectively. 
          
          
          
@@ -25,4 +25,4 @@ There are two subfolders: Plot_maps and Tables. These folders contain output res
          
          
          (3) seasonal_distance.csv (name subject to change)
-                      This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (lat and long)                               per species and the recorded number of observations. 
+                      This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (lat and long) per species and the recorded number of observations. 
