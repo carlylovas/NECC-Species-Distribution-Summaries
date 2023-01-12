@@ -12,9 +12,17 @@ This folder contains the prep code for cleaning the survey data (01_SurveyDataPr
 
 #TEMP_RESULTS
 There are two subfolders: Plot_maps and Tables. These folders contain output results from the above analysis. Plot_maps will contain graphs and distribution maps pertaining to 02_SpeciesDistAnaylsis and Tables contains multiple CSV files of outputs. Within Tables you will find three CSV files:
-          (1) NEFSC_YearSeasonDistributionSummaries.csv
+         
+         
+         (1) NEFSC_YearSeasonDistributionSummaries.csv
                       This table contains the year-season center of latitude and longitude per species. Additionally, there are two columns including the                         rate of change associated with the center of latitude and center of longitude, respectively. 
-          (2) NEFSC_YearlyDistributionSummaries.csv
+         
+         
+         
+         (2) NEFSC_YearlyDistributionSummaries.csv
                       This table includes the changes in center of latitude and longtitude per species per year. Rate of change is also included. 
-          (3) seasonal_distance.csv (name subject to change)
-                      This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (latitude and longitude)                       per species and the recorded number of observations. 
+         
+         
+         
+         (3) seasonal_distance.csv (name subject to change)
+                      This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (lat and long)                               per species and the recorded number of observations. 
