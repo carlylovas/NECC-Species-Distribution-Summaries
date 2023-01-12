@@ -77,3 +77,52 @@ COGravity <- function(x,y=NULL,z=NULL,wt=NULL) {
     y <- yll + c(0:(nc - 1)) * cs
     return(list(x = x, y = y))
 }
+
+
+make_survdat_occu <- function(survdat_clean, species_keep){
+  #### 1. Filter SURVDAT to species of interest based on character or numeric vector `species_keep` and aggregate abundance and biomass data for these species at each tow location   ####
+  if (all(is.character(species_keep))) {
+    presence_data <- survdat_clean %>%
+      dplyr::filter(., comname %in% species_keep)
+  } else {
+    presence_data <- survdat_clean %>%
+      dplyr::filter(., comname %in% species_keep)
+  }
+  presence_data<- presence_data %>%
+    dplyr::group_by(., id, svspp, comname) %>%
+    dplyr::summarise(
+      sum_abundance = sum(abundance),
+      sum_biomass_kg = sum(unique(biomass_kg))
+    ) %>%
+    dplyr::mutate(presence = ifelse(sum_abundance > 0, 1, 0)) %>% # should all be 1s, presence = 1 if abundance >=1, presence = 0 if abundance = 0
+    dplyr::select(id, svspp, comname, presence, sum_abundance, sum_biomass_kg) %>%
+    dplyr::ungroup()
+  #### 2. Create dataframe with all possible tow/species combinations   ####
+  # Create a dataframe of all possible survey ID/species combinations
+  all_spp <- survdat_clean %>% distinct(comname, svspp)
+  all_id_spec_possibilites <- survdat_clean %>%
+    tidyr::expand(id, comname) %>%
+    left_join(all_spp, by = "comname") %>%
+    dplyr::filter(., comname %in% presence_data$comname)
+  #### 3. Join all possible tow/species dataframe with presence data and impute absences   ####
+  survdat_occu<- all_id_spec_possibilites %>%
+    dplyr::left_join(presence_data, by = c("id", "svspp", "comname")) %>%
+    #populate "possibilities" dataset with presence data
+    dplyr::mutate(presence = ifelse(is.na(presence) == T, 0, presence)) %>%
+    dplyr::mutate(sum_biomass_kg = ifelse(is.na(sum_biomass_kg) == T, 0.000, sum_biomass_kg)) %>%
+    dplyr::mutate(sum_abundance = ifelse(is.na(sum_abundance) == T, 0, sum_abundance)) %>%
+    dplyr::select(id, svspp, comname, presence, sum_abundance, sum_biomass_kg)
+  # Return it
+  return(survdat_occu)
+}
+
+
+get_survdat_tows <- function(survdat_clean) {
+  #### 1. Filter SURVDAT to unique tows and keep columns of interest   ####
+  # Get unique tows
+  survdat_tows <- survdat_clean %>%
+    dplyr::distinct(id, est_towdate, est_year, est_month, est_day, season, svvessel, decdeg_beglat, decdeg_beglon, survey_area, avgdepth, surftemp, surfsalin, bottemp, botsalin) %>%
+    dplyr::filter(!is.na(decdeg_beglat) & !is.na(decdeg_beglon))
+  # Return it
+  return(survdat_tows)
+}
