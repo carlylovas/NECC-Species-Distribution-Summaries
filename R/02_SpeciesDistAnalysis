@@ -17,7 +17,7 @@ library(gmRi)
 ## Start work
 
 # load the necc_fishes data, which we created using the O1_SurveyDataPrep.R function
-necc_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
+NECC_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
 
 ####Calculate Center of Gravity
 ##linear model functions to map over nested data
@@ -42,8 +42,8 @@ COG_w_season<- NECC_fishes%>%
 COG_w_season<-COG_w_season%>%
   group_by(comname, season)%>%
   nest()%>%
-  mutate(centerLat=map(data, species_lat_mod))%>%
-  mutate(centerLon=map(data, species_lon_mod))
+  mutate(centerLat_mod=map(data, species_lat_mod))%>%
+  mutate(centerLon_mod=map(data, species_lon_mod))
 
 #Center of Gravity without season
 COG_wo_season<-NECC_fishes%>%
@@ -57,19 +57,19 @@ COG_wo_season<-NECC_fishes%>%
 COG_wo_season<-COG_wo_season%>%
   group_by(comname)%>%
   nest()%>%
-  mutate(centerLat=map(data, species_lat_mod))%>%
-  mutate(centerLon=map(data, species_lon_mod))
+  mutate(centerLat_mod=map(data, species_lat_mod))%>%
+  mutate(centerLon_mod=map(data, species_lon_mod))
 
 ##extract coefficients from nested models
 COG_wo_season<-COG_wo_season%>%
-  mutate(tidyLat=map(centerLat,broom::tidy),
-         tidyLon=map(centerLon,broom::tidy),
+  mutate(tidyLat=map(centerLat_mod,broom::tidy),
+         tidyLon=map(centerLon_mod,broom::tidy),
          slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
          slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
 
 COG_w_season<-COG_w_season%>%
-  mutate(tidyLat=map(centerLat,broom::tidy),
-         tidyLon=map(centerLon,broom::tidy),
+  mutate(tidyLat=map(centerLat_mod,broom::tidy),
+         tidyLon=map(centerLon_mod,broom::tidy),
          slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
          slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
          
