@@ -485,9 +485,38 @@ geoTest<-geoTest%>%
 season_dist<-geoTest%>%
   select(comname, num_obs, slope)
 
+#map linear model (distance ~ year)
+
+dist_mod<-function(df){
+  temp<-df%>%
+    drop_na(dist)
+  lm(dist~est_year, data=temp)
+}
+dist_count<-function(df){
+  temp<-df%>%
+    drop_na()%>%
+    nrow()
+}
+slope<-function(x) x$estimate[2]
+
+season_dist<-season_dist%>%
+  mutate(mod=map(data, possibly(dist_mod, NA)),
+         num_obs=map(data, possibly(dist_count, NA)),
+         tidy=map(mod, possibly(broom::tidy, NA)),
+         slope=map(tidy, possibly(slope, NA)))
+
+season_dist_km<-season_dist_km%>%
+  mutate(mod=map(data, possibly(dist_mod, NA)),
+         num_obs=map(data, possibly(dist_count, NA)),
+         tidy=map(mod, possibly(broom::tidy, NA)),
+         slope=map(tidy, possibly(slope, NA)))
+
+season_dist_km<-season_dist_km %>% select(comname, num_obs, slope)
+  
+
 library(MASS)
 write.matrix(season_dist, "seasonal distance.csv", sep=',')
-
+write.matrix(season_dist_km, "Rate_of_Seasonal_Change_kilometers.csv", sep=',')
 
 ####pre and post 2010
 pre2010<-clean_w_season%>%

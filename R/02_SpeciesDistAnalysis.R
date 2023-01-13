@@ -19,6 +19,9 @@ library(gmRi)
 # load the necc_fishes data, which we created using the O1_SurveyDataPrep.R function
 NECC_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
 
+
+###CSL: This needs to be edited to match the survey data I used; biomass_kg vs. sum_biomass_kg. Also need to filter the survey data to include only the fish in the speciesList_inNECC.csv
+
 ####Calculate Center of Gravity
 ##linear model functions to map over nested data
 
@@ -107,6 +110,13 @@ season_dist<-season_dist%>%
   group_by(comname)%>%
   nest()
 
+season_dist_km<-season_dist%>%
+  unnest(data)%>%
+  group_by(comname, est_year)%>%
+  summarise(dist_km=(dist/1000))
+
+write.csv(season_dist_km, "Seasonal_Distance_CofBiomass.csv", row.names = FALSE)
+
 #map linear model (distance ~ year)
 
 dist_mod<-function(df){
@@ -121,11 +131,17 @@ dist_count<-function(df){
 }
 slope<-function(x) x$estimate[2]
 
-season_dist<-season_dist%>%
+season_dist_km<-season_dist_km%>%
+  rename("dist" = "dist_km")%>%
+  group_by(comname)%>%
+  nest()
+
+season_dist_km<-season_dist_km%>%
   mutate(mod=map(data, possibly(dist_mod, NA)),
          num_obs=map(data, possibly(dist_count, NA)),
          tidy=map(mod, possibly(broom::tidy, NA)),
          slope=map(tidy, possibly(slope, NA)))
+
 
 ####clean and write csv files
 library(MASS)
@@ -140,6 +156,6 @@ clean_wo_season<-COG_wo_season%>%
          "Common Name"="comname", "Year"="est_year")
 write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
 
-season_dist<-season_dist%>%
+season_dist_km<-season_dist_km%>%
   select(comname, num_obs, slope)
-write.matrix(season_dist, "seasonal distance.csv", sep=',')
+write.matrix(season_dist_km, "Seasonal_Rate_Change.csv", sep=",")

@@ -39,6 +39,7 @@ head(NECC)
 necc_fishes<- make_survdat_occu(survdat_clean = clean_survey, species_keep = NECC$comname)
 summary(necc_fishes)
 
+
 # check this worked -- should have the same number of samples (tows) for each species and vice versa
 check1 <- necc_fishes %>%
     group_by(comname) %>%
@@ -52,7 +53,8 @@ summary(check2)
 
 # as you had in your code, we are also going to need information about each tow (lat, lon, season, etc). this is located in the survey_tows file, which we can join to our necc_fishes occupancy data
 necc_fishes <- necc_fishes %>%
-    left_join(., survey_tows)
+    left_join(., survey_tows) %>%
+    rename("biomass_kg"="sum_biomass_kg")
 
 # Now, we might think about saving this so that we don't have to run this bit of code every time we work. Let's put it in data and just see how big it is. Looks like it will be okay.
 saveRDS(necc_fishes, file = here("Data", "necc_fishes_occu.rds"))
