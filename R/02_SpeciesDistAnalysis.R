@@ -20,8 +20,6 @@ library(gmRi)
 NECC_fishes<- readRDS(here("Data", "necc_fishes_occu.rds"))
 
 
-###CSL: This needs to be edited to match the survey data I used; biomass_kg vs. sum_biomass_kg. Also need to filter the survey data to include only the fish in the speciesList_inNECC.csv
-
 ####Calculate Center of Gravity
 ##linear model functions to map over nested data
 
