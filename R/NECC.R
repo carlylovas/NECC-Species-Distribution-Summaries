@@ -26,7 +26,7 @@ NECC_fishes<-clean_survey %>%
 summary(NECC_fishes)
 
 
-# center of latitude over time?
+# center of latitude over time####
 
 dogfish_fall <- NECC_fishes %>%
   filter(comname == "smooth dogfish") %>%
@@ -86,7 +86,7 @@ All_spp_lat%>%
   geom_point()+
   geom_smooth(method="lm")
 
-##functions & looping
+##functions & looping####
 library(tidyverse)
 library(tidyr)
 
@@ -395,7 +395,7 @@ tautog_cog<-clean_w_season%>%
   filter(`Common Name`=="tautog",
          Season == "Fall")
 
-##calc distance between seasons
+##calc distance between seasons####
 install.packages(c("sf", "geodist", "geosphere"))
 library(sf)
 library(geodist)
@@ -518,13 +518,15 @@ library(MASS)
 write.matrix(season_dist, "seasonal distance.csv", sep=',')
 write.matrix(season_dist_km, "Rate_of_Seasonal_Change_kilometers.csv", sep=',')
 
-####pre and post 2010
+####pre and post 2010####
 pre2010<-clean_w_season%>%
   filter(est_year<2009)
 
 post2010<-clean_w_season%>%
   filter(est_year>2009)
 
+write.csv(post2010, "post_2010.csv", row.names = FALSE)
+write.csv(pre2010, "pre_2010.csv", row.names=FALSE)
 
 ####plots 
 plot_fun<-function(df){
@@ -590,6 +592,7 @@ post2010%>%
     axis.text.x = element_blank(),
     axis.ticks = element_blank())+
   facet_wrap(~comname)
+
 
 
 ####MAPS####
