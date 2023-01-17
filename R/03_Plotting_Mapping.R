@@ -50,3 +50,61 @@ slopes%>%
   ggtitle("Changes in Center of Latitude")
 
 #plotting biomass centroids####
+yellow_flounder<-clean_wo_season%>%
+  filter(comname == "yellowtail flounder")%>%
+  ggplot()+
+  stat_density_2d_filled(aes(est_year, COGy))+
+  scale_color_gmri()+
+  theme_gmri(legend.position="none")+
+  ylab("Center of Latitude")
+print(yellow_flounder)  
+
+#plotting slopes pre- and post-2010
+pre2010_slopes_fall<-pre2010%>%
+  unnest(data)%>%
+  filter(season == "Fall")%>%
+  select(comname, est_year, slopeLat)%>%
+  group_by(comname, slopeLat,season)%>%
+  nest()%>%
+  mutate(z=slopeLat>0)
+
+pre2010_slopes_fall<-pre2010%>%
+  unnest(data)%>%
+  filter(season == "Spring")%>%
+  select(comname, est_year, slopeLat)%>%
+  group_by(comname, slopeLat,season)%>%
+  nest()%>%
+  mutate(z=slopeLat>0)
+
+post2010_slopes_fall<-post2010%>%
+  unnest(data)%>%
+  filter(season == "Fall")%>%
+  select(comname, est_year, slopeLat)%>%
+  group_by(comname, slopeLat)%>%
+  nest()%>%
+  mutate(z=slopeLat>0)
+
+pre2010_slopes_fall%>%
+  ggplot()+
+  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
+  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
+  ylab("Rate of Change")+
+  ggtitle("Changes in Center of Latitude, Fall 1970-2009")
+
+post2010_slopes_fall%>%
+  ggplot()+
+  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
+  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
+  ylab("Rate of Change")+
+  ggtitle("Changes in Center of Latitude, Fall 2009-2019")
+
