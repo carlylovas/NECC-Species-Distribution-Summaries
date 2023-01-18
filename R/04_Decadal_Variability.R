@@ -104,6 +104,38 @@ do.call(grid.arrange, c(list2, ncol = 2))
 list_3<-dist_plotlist[c("alewife", "scup", "smooth dogfish", "spiny dogfish")] #strong migrators 
 do.call(grid.arrange, c(list_3, ncol=2))
 
+#decadal maps 
+map_df<-clean_w_season%>%
+  mutate(decade = 10*est_year %/% 10)%>%
+  group_by(comname)%>%
+  nest()
+nrow(map_df)
+decade_maps<-vector("list",length=41)
+names(decade_maps)=paste(unique(clean_w_season$comname))
+
+for(i in 1:41){
+  print(i)
+  loop_df<-map_df[,]%>%
+    unnest(data)%>%
+    select(comname, COGx, COGy, decade)%>%
+    group_by(comname)
+  
+  decade_maps[[i]]<-ggplot(loop_df, aes(COGx, COGy))+
+    geom_point()+
+    theme_gmri()+
+    ggtitle(names(decade_maps)[i])+
+    ylab("Center of Latitude")+
+    xlab("Center of Longitude")+
+    scale_y_continuous(breaks = c(36,40,44)) + scale_x_continuous(breaks = c(-72,-66)) +
+    facet_wrap(~decade, ncol=5)
+}
+decade_list<-decade_maps[1]
+do.call(grid.arrange, decade_list)
+
+###Calculate latitudinal biomass percentiles, plot per decade
+install.packages("Hmisc")
+library(Hmisc)
+
 ###Survey data with depth, bottom temperature, and Janet Nye's method of calculating lat/lon
 
 

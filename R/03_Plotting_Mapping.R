@@ -59,69 +59,6 @@ yellow_flounder<-clean_wo_season%>%
   ylab("Center of Latitude")
 print(yellow_flounder)  
 
-#plotting slopes pre- and post-2010
-pre2010_slopes_fall<-pre2010%>%
-  unnest(data)%>%
-  filter(season == "Fall")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat,season)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-pre2010_slopes_fall<-pre2010%>%
-  unnest(data)%>%
-  filter(season == "Spring")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat,season)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-post2010_slopes_fall<-post2010%>%
-  unnest(data)%>%
-  filter(season == "Fall")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-pre2010_slopes_fall%>%
-  ggplot()+
-  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
-  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
-  theme_gmri(axis.text.x=element_blank(),
-             axis.title.x=element_blank(),
-             legend.position="none")+
-  scale_color_gmri()+
-  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
-  ylab("Rate of Change")+
-  ggtitle("Changes in Center of Latitude, Fall 1970-2009")
-
-post2010_slopes_fall%>%
-  ggplot()+
-  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
-  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
-  theme_gmri(axis.text.x=element_blank(),
-             axis.title.x=element_blank(),
-             legend.position="none")+
-  scale_color_gmri()+
-  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
-  ylab("Rate of Change")+
-  ggtitle("Changes in Center of Latitude, Fall 2009-2019")
-
-#####plotting seasonal migration patterns#
-dist_km<-Seasonal_Distance_CofBiomass
-dist_km%>%
-  filter(comname == "alewife") %>%
-  ggplot(aes(est_year, dist_km))+
-  geom_point()+
-  geom_line()+
-  geom_smooth(method="lm")+
-  theme_gmri()+
-  xlab("Year")+
-  ylab("Distance (km)")+
-  ggtitle("Migratory Distance of Alewife")+
-  scale_color_gmri()
-
 ##plot loopz##
 #without season
 n_spp<-nrow(COG_wo_season)
@@ -144,5 +81,11 @@ for (i in 1:n_spp) {
 
 list1 = plotlist[c(1:8)]
 do.call(grid.arrange, c(list1, ncol = 4))
+
+#with season
+
+
+
+
 
 
