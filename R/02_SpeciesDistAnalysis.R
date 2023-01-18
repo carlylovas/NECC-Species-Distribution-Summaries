@@ -179,10 +179,12 @@ write.csv(pre2010, "pre_2010.csv", row.names=FALSE)
 pre2010<-pre2010%>%
   mutate(lat_mod=map(data, species_lat_mod),
          tidy_lat=map(lat_mod,broom::tidy),
+         glance=map(lat_mod, broom::glance),
          slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
 
 #post2010 model
 post2010<-post2010%>%
   mutate(lat_mod=map(data, species_lat_mod),
          tidy_lat=map(lat_mod,broom::tidy),
+         glance=map(lat_mod, broom::glance),
          slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))

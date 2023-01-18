@@ -520,13 +520,31 @@ write.matrix(season_dist_km, "Rate_of_Seasonal_Change_kilometers.csv", sep=',')
 
 ####pre and post 2010####
 pre2010<-clean_w_season%>%
-  filter(est_year<2009)
+  filter(est_year<2009)%>%
+  select(comname, season, est_year, COGx, COGy)%>%
+  group_by(comname, season)%>%
+  nest()
 
 post2010<-clean_w_season%>%
-  filter(est_year>2009)
+  filter(est_year>2009)%>%
+  select(comname,season,est_year,COGx,COGy)%>%
+  group_by(comname, season)%>%
+  nest()
 
 write.csv(post2010, "post_2010.csv", row.names = FALSE)
 write.csv(pre2010, "pre_2010.csv", row.names=FALSE)
+
+#pre2010 model
+pre2010<-pre2010%>%
+  mutate(lat_mod=map(data, species_lat_mod),
+         tidy_lat=map(lat_mod,broom::tidy),
+         slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
+
+#post2010 model
+post2010<-post2010%>%
+  mutate(lat_mod=map(data, species_lat_mod),
+         tidy_lat=map(lat_mod,broom::tidy),
+         slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
 
 ####plots 
 plot_fun<-function(df){
@@ -595,7 +613,7 @@ post2010%>%
 
 
 
-####MAPS####
+####MAPS/PLOTS####
 maps<-clean_w_season%>%
   select(comname, season, est_year, COGx, COGy)%>%
   unite(COGx, COGy, col="coords",sep=",")
@@ -608,3 +626,5 @@ clean_wo_season%>%
   xlab("Latitude")+
   ylab("Longitude")+
   ggtitle("acadian redfish")
+
+##plots

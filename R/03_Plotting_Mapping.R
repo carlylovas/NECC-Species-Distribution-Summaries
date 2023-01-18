@@ -108,3 +108,41 @@ post2010_slopes_fall%>%
   ylab("Rate of Change")+
   ggtitle("Changes in Center of Latitude, Fall 2009-2019")
 
+#####plotting seasonal migration patterns#
+dist_km<-Seasonal_Distance_CofBiomass
+dist_km%>%
+  filter(comname == "alewife") %>%
+  ggplot(aes(est_year, dist_km))+
+  geom_point()+
+  geom_line()+
+  geom_smooth(method="lm")+
+  theme_gmri()+
+  xlab("Year")+
+  ylab("Distance (km)")+
+  ggtitle("Migratory Distance of Alewife")+
+  scale_color_gmri()
+
+##plot loopz##
+#without season
+n_spp<-nrow(COG_wo_season)
+plotlist <- vector("list", length = n_spp)
+names(plotlist) <- paste(COG_wo_season$comname)
+str(plotlist )
+
+for (i in 1:n_spp) {
+  print(i)
+  loop_df <- COG_wo_season[i,] %>%
+    unnest(data) %>%
+    select(comname, est_year, COGy) %>%
+    group_by(comname)
+  
+  plotlist[[i]] <- ggplot(loop_df, aes(est_year, COGy)) +
+    geom_point() +
+    ggtitle(names(plotlist)[i]) +
+    geom_smooth(method = "lm")
+}
+
+list1 = plotlist[c(1:8)]
+do.call(grid.arrange, c(list1, ncol = 4))
+
+
