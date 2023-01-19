@@ -2,11 +2,13 @@
 install.packages("rnaturalearth")
 install.packages("rnaturalearthdata")
 install.packages("ggrepel")
+install.packages("ggspatial")
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(ggplot2)
 library(sf)
 library(ggrepel)
+library(ggspatial)
 
 #plotting changes in seasonal centroid
 season_dist_km%>%
@@ -79,7 +81,7 @@ for (i in 1:n_spp) {
     geom_smooth(method = "lm")
 }
 
-list1 = plotlist[c(1:8)]
+list1 = plotlist[c(1:4)]
 do.call(grid.arrange, c(list1, ncol = 4))
 
 #with season

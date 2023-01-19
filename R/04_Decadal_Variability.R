@@ -93,7 +93,7 @@ for (i in 1:n_dist) {
   
   dist_plotlist[[i]] <- ggplot(loop_df, aes(est_year, dist_km)) +
     geom_point() +  
-    theme_gmri(axis.text.x=element_blank(),legend.position="none")+
+    theme_gmri(legend.position="none")+
     scale_color_gmri()+
     ggtitle(names(dist_plotlist)[i]) +
     geom_smooth(method = "lm")
@@ -104,7 +104,13 @@ do.call(grid.arrange, c(list2, ncol = 2))
 list_3<-dist_plotlist[c("alewife", "scup", "smooth dogfish", "spiny dogfish")] #strong migrators 
 do.call(grid.arrange, c(list_3, ncol=2))
 
-#decadal maps 
+
+#decadal maps with season
+world <- ne_countries(scale = "medium", returnclass = "sf")
+ggplot(data = world) +
+  geom_sf()+
+  coord_sf(crs="+init=epsg:4326")
+
 map_df<-clean_w_season%>%
   mutate(decade = 10*est_year %/% 10)%>%
   group_by(comname)%>%
@@ -115,26 +121,66 @@ names(decade_maps)=paste(unique(clean_w_season$comname))
 
 for(i in 1:41){
   print(i)
-  loop_df<-map_df[,]%>%
+  loop_df<-map_df[i,]%>%
     unnest(data)%>%
-    select(comname, COGx, COGy, decade)%>%
+    select(comname, COGx, COGy,season, decade)%>%
     group_by(comname)
   
-  decade_maps[[i]]<-ggplot(loop_df, aes(COGx, COGy))+
-    geom_point()+
+  decade_maps[[i]]<-ggplot(data=world)+
+    geom_sf()+
+    coord_sf(xlim=c(-80, -65), ylim=c(30,47))+
+    geom_point(data=loop_df, aes(x=COGx,y=COGy,color=season))+
     theme_gmri()+
-    ggtitle(names(decade_maps)[i])+
+    ggtitle(toupper(names(decade_maps)[i]))+
     ylab("Center of Latitude")+
     xlab("Center of Longitude")+
-    scale_y_continuous(breaks = c(36,40,44)) + scale_x_continuous(breaks = c(-72,-66)) +
+    scale_y_continuous(breaks = c(36,40,44)) + scale_x_continuous(breaks = c(-78,-72,-66)) +
     facet_wrap(~decade, ncol=5)
 }
-decade_list<-decade_maps[1]
+decade_list<-decade_maps[28]
 do.call(grid.arrange, decade_list)
+
 
 ###Calculate latitudinal biomass percentiles, plot per decade
 install.packages("Hmisc")
 library(Hmisc)
+biomass_by_lat<-clean_w_season%>%
+  drop_na()%>%
+  mutate(decade=10*est_year %/% 10)%>%
+  group_by(comname, decade)%>%
+  nest()
+
+lat_quant<-function(df){
+  quantile(df$COGy, probs=c(0.05, 0.1, 0.25, 0.75, 0.9, 0.95))
+}
+
+biomass_by_lat<-biomass_by_lat%>%
+  mutate(percentile = map(data, lat_quant))%>%
+  group_by(comname, decade)
+
+test<-biomass_by_lat%>%
+  unnest_wider(percentile)
+
+test2<-biomass_by_lat%>%
+  unnest_longer(percentile)
+
+test2%>%
+  filter(comname == "alewife")%>%
+  unnest(data)%>%
+  ggplot()+
+  geom_point(aes(COGx, COGy))+
+  facet_wrap(~decade, ncol=5)
+
+test2%>%
+  unnest(data)%>%
+  filter(comname == "smooth dogfish",
+         season == "Spring")%>%
+  ggplot()+
+  geom_density(aes(COGy))+
+  facet_wrap(~decade, nrow=3, ncol=3)
+
+##weighted quantiles 
+
 
 ###Survey data with depth, bottom temperature, and Janet Nye's method of calculating lat/lon
 

@@ -188,3 +188,4 @@ post2010<-post2010%>%
          tidy_lat=map(lat_mod,broom::tidy),
          glance=map(lat_mod, broom::glance),
          slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
+
