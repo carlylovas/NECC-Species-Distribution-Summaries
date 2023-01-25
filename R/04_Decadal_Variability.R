@@ -136,10 +136,14 @@ for(i in 1:41){
     xlab("Center of Longitude")+
     scale_y_continuous(breaks = c(36,40,44)) + scale_x_continuous(breaks = c(-78,-72,-66)) +
     facet_wrap(~decade, ncol=5)
+  
+  filename = paste('Center_of_Biomass', unique(loop_df$comname), sep='_')
+  ggsave(decade_maps[[i]], file= paste("Temp_Results/Maps/", filename,".pdf",sep=""),
+         width=6.5, height=4.5)
 }
-decade_list<-decade_maps[28]
-do.call(grid.arrange, decade_list)
 
+decade_list<-decade_maps[21]
+do.call(grid.arrange, decade_list)
 
 ###Calculate latitudinal biomass percentiles, plot per decade
 install.packages("Hmisc")
@@ -181,12 +185,7 @@ test2%>%
 
 ##weighted quantiles 
 
-
-###Survey data with depth, bottom temperature, and Janet Nye's method of calculating lat/lon
-
-
-
-
+###Survey data with depth, surface & bottom temperature, and Janet Nye's method of calculating lat/lon
 
 
 
