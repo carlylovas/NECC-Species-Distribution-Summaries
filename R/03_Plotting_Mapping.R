@@ -11,16 +11,40 @@ library(ggrepel)
 library(ggspatial)
 
 #plotting changes in seasonal centroid
-season_dist_km%>%
+season_dist_km<-season_dist_km%>%
   drop_na()%>%
-  mutate(m = as.numeric(slope))%>%
+  mutate(slope = as.numeric(slope),
+         z = slope>0)
+  
+season_dist_km%>%
   ggplot()+
-  geom_point(aes(comname, m))+
-  theme_gmri(axis.text.x=element_text(angle=90, size=8),
-             axis.text.y=element_text(size=8))+
-  geom_hline(yintercept=0)+
+  geom_point(aes(x=comname, y=slope, color=as.factor(z)))+
+  geom_text_repel(aes(comname, slope, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
   ylab("Rate of Change")+
-  xlab("Common Name")
+  ggtitle("Changes in Seasonal Distance")
+
+#plot average seasonal distance
+avg_fun<-function(df){
+  mean(df$dist_km, na.rm=TRUE)
+}
+dist_km<-dist_km%>%
+  mutate(avg = map_dbl(data, avg_fun))
+
+dist_km %>%
+  ggplot()+
+  geom_point(aes(x=comname, y=avg), color="#00736D")+
+  geom_text_repel(aes(comname, avg, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  ylab("Average Distance (km)")+
+  ggtitle("Average Distance Between Fall & Spring Surveys")
 
 #plot changes in center of lat####
 slopes<-clean_wo_season%>%
@@ -50,6 +74,45 @@ slopes%>%
   geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
   ylab("Rate of Change")+
   ggtitle("Changes in Center of Latitude")
+
+##Fall Slopes
+fall_slopes<-clean_w_season%>%
+  filter(season == "Fall")%>%
+  select(comname, season, slopeLat)%>%
+  distinct()%>%
+  mutate(z=slopeLat>0)
+##Spring Slopes
+spring_slopes<-clean_w_season%>%
+  filter(season == "Spring")%>%
+  select(comname, season, slopeLat)%>%
+  distinct()%>%
+  mutate(z=slopeLat>0)
+
+###Plot seasonal Rate of Change
+fall_slopes%>%
+  ggplot()+
+  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
+  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
+  ylab("Rate of Change")+
+  ggtitle("Changes in Fall Center of Latitude")
+
+spring_slopes%>%
+  ggplot()+
+  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
+  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
+  theme_gmri(axis.text.x=element_blank(),
+             axis.title.x=element_blank(),
+             legend.position="none")+
+  scale_color_gmri()+
+  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
+  ylab("Rate of Change")+
+  ggtitle("Changes in Spring Center of Latitude")
+
 
 #plotting biomass centroids####
 yellow_flounder<-clean_wo_season%>%
