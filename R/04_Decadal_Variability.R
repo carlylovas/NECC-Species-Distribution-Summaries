@@ -1,66 +1,5 @@
 ##Examining distribution changes by decade##
 
-###plotting slopes pre- and post-2010
-pre2010_slopes_fall<-pre2010%>%
-  unnest(data)%>%
-  filter(season == "Fall")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat,season)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-pre2010_slopes_fall<-pre2010%>%
-  unnest(data)%>%
-  filter(season == "Spring")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat,season)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-post2010_slopes_fall<-post2010%>%
-  unnest(data)%>%
-  filter(season == "Fall")%>%
-  select(comname, est_year, slopeLat)%>%
-  group_by(comname, slopeLat)%>%
-  nest()%>%
-  mutate(z=slopeLat>0)
-
-pre2010_slopes_fall%>%
-  ggplot()+
-  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
-  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
-  theme_gmri(axis.text.x=element_blank(),
-             axis.title.x=element_blank(),
-             legend.position="none")+
-  scale_color_gmri()+
-  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
-  ylab("Rate of Change")+
-  ggtitle("Changes in Center of Latitude, Fall 1970-2009")
-
-post2010_slopes_fall%>%
-  ggplot()+
-  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
-  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
-  theme_gmri(axis.text.x=element_blank(),
-             axis.title.x=element_blank(),
-             legend.position="none")+
-  scale_color_gmri()+
-  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
-  ylab("Rate of Change")+
-  ggtitle("Changes in Center of Latitude, Fall 2009-2019")
-
-pre2010_slopes%>%
-  ggplot()+
-  geom_point(aes(x=comname, y=slopeLat, color=as.factor(z)))+
-  geom_text_repel(aes(comname, slopeLat, label=comname), size=2.8, nudge_y=0.003)+
-  theme_gmri(axis.text.x=element_blank(),
-             axis.title.x=element_blank(),
-             legend.position="none")+
-  scale_color_gmri()+
-  geom_hline(yintercept=0, linetype=2, linewidth=0.5, color="#00736D")+
-  ylab("Rate of Change")+
-  facet_wrap(~season)
-
 #####plotting seasonal migration patterns#
 dist_km<-Seasonal_Distance_CofBiomass
 dist_km%>%
@@ -104,7 +43,6 @@ do.call(grid.arrange, c(list2, ncol = 2))
 list_3<-dist_plotlist[c("alewife", "scup", "smooth dogfish", "spiny dogfish")] #strong migrators 
 do.call(grid.arrange, c(list_3, ncol=2))
 
-
 #decadal maps with season
 world <- ne_countries(scale = "medium", returnclass = "sf")
 ggplot(data = world) +
@@ -145,45 +83,6 @@ for(i in 1:41){
 decade_list<-decade_maps[21]
 do.call(grid.arrange, decade_list)
 
-###Calculate latitudinal biomass percentiles, plot per decade
-#Kathy says not important
-install.packages("Hmisc")
-library(Hmisc)
-biomass_by_lat<-clean_w_season%>%
-  drop_na()%>%
-  mutate(decade=10*est_year %/% 10)%>%
-  group_by(comname, decade)%>%
-  nest()
-
-lat_quant<-function(df){
-  quantile(df$COGy, probs=c(0.05, 0.1, 0.25, 0.75, 0.9, 0.95))
-}
-
-biomass_by_lat<-biomass_by_lat%>%
-  mutate(percentile = map(data, lat_quant))%>%
-  group_by(comname, decade)
-
-test<-biomass_by_lat%>%
-  unnest_wider(percentile)
-
-test2<-biomass_by_lat%>%
-  unnest_longer(percentile)
-
-test2%>%
-  filter(comname == "alewife")%>%
-  unnest(data)%>%
-  ggplot()+
-  geom_point(aes(COGx, COGy))+
-  facet_wrap(~decade, ncol=5)
-
-test2%>%
-  unnest(data)%>%
-  filter(comname == "smooth dogfish",
-         season == "Spring")%>%
-  ggplot()+
-  geom_density(aes(COGy))+
-  facet_wrap(~decade, nrow=3, ncol=3)
-
 ###Survey data with depth, surface & bottom temperature, and Janet Nye's method of calculating lat/lon
 install.packages("matrixStats")
 library(matrixStats)
@@ -211,6 +110,106 @@ grouped_center_bio <- function(clean_survey, ...){
 weighted_data<-grouped_center_bio(clean_survey, est_year)
 dec_data<-weighted_data%>%
   select(comname, est_year, avg_depth, avg_bot_temp, avg_sur_temp)%>%
+  mutate(decade = 10*est_year %/% 10)%>%
   group_by(comname)%>%
   nest()
 
+##linear model functions
+depth_mod<-function(df){
+  lm(avg_depth~est_year, data=df)
+}
+bot_temp_mod<-function(df){
+  lm(avg_bot_temp~est_year, data=df)
+}
+sur_temp_mod<-function(df){
+  lm(avg_sur_temp~est_year, data=df)
+}
+
+slope<-function(x) x$estimate[2]
+
+dec_data<-dec_data%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)))
+dec_data<-dec_data%>%
+  nest(models = c(depth_mod:sur_temp_mod))
+dec_data<-dec_data%>%
+  filter(comname %in% c(
+    "acadian redfish"          ,"american plaice"          ,"atlantic cod"            , "atlantic herring"        ,
+    "black sea bass"           ,"blackbelly rosefish"      ,"buckler dory"            , "butterfish"              ,
+    "cunner"                   ,"fawn cusk-eel"            ,"goosefish"               , "haddock"                 ,
+    "little skate"             ,"longhorn sculpin"         ,"northern searobin"       , "offshore hake"           ,
+    "red hake"                 ,"scup"                     ,"sea raven"               , "silver hake"             ,
+    "smooth skate"             ,"thorny skate"             ,"windowpane flounder"     , "winter flounder"         ,
+    "witch flounder"           ,"yellowtail flounder"      ,"blueback herring"        , "fourspot flounder"       ,
+    "spotted hake"             ,"atlantic wolffish"        ,"ocean pout"              , "white hake"              ,
+    "chain dogfish"            ,"rosette skate"            ,"weakfish"                , "american shad"           ,
+    "cusk"                     ,"winter skate"             ,"atlantic halibut"        , "pollock"                 ,
+    "round herring"            ,"bluefish"                 ,"spiny dogfish"           , "clearnose skate"         ,
+    "atlantic mackerel"        ,"atlantic thread herring"  ,"striped bass"            , "spanish sardine"         ,
+    "spot"                     ,"barndoor skate"           ,"summer flounder"         , "atlantic croaker"        ,
+    "smooth dogfish"           ,"northern kingfish"        ,"roughtail stingray"      , "atlantic spadefish"      ,
+    "southern kingfish"        ,"atlantic angel shark"     ,"greater amberjack"       , "bullnose ray"            ,
+    "spanish mackerel"         ,"spiny butterfly ray"      ,"smooth butterfly ray"    , "cownose ray"             ,
+    "sand tiger"               ,"sandbar shark"            ,"atlantic sharpnose shark", "atlantic sturgeon"  
+  ))
+##missing 2
+
+##include and nest all stats
+dec_data<-dec_data%>%
+  unnest(models)%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod),
+       tidy_glance = c(depth_tidy:surf_glance),
+       slope = c(depth_slope:surf_slope),
+       p = c(depth_p:surf_p))
+
+##depth plots
+dec_data%>%
+  filter(comname == "acadian redfish")%>%
+  unnest(data)%>%
+  ggplot(aes(est_year, avg_depth))+
+  geom_point()+
+  theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
+  facet_wrap(~decade, ncol=5, scales="free_x")+
+  scale_x_continuous(breaks = seq(1970, 2020, by=2))+
+  scale_y_reverse()+
+  ggtitle("Average Depth of Acadian Redfish")+
+  ylab("Average Depth")+
+  xlab("Year")
+
+##depth plot loop
+depth_df<-dec_data%>%
+  unnest(data)%>%
+  select(comname, est_year, avg_depth, decade)%>%
+  group_by(comname)%>%
+  nest()
+
+nrow(depth_df)
+depth_plots<-vector("list",length=66)
+names(depth_plots)=paste(unique(dec_data$comname))
+
+for(i in 1:66){
+  print(i)
+  loop_df<-depth_df[i,]%>%
+    unnest(data)%>%
+    select(comname, est_year, avg_depth, decade)%>%
+    group_by(comname)
+  
+  depth_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_depth))+
+    geom_point()+
+    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
+    facet_wrap(~decade, ncol=5, scales="free_x")+
+    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
+    scale_y_reverse()+
+    ggtitle(ggtitle(toupper(names(depth_plots)[i])))+
+    ylab("Average Depth")+
+    xlab("Year")
+  
+  filename = paste('average_depth', unique(loop_df$comname), sep='_')
+  ggsave(depth_plots[[i]], file = paste(filename,".pdf",sep=""),
+         width=11, height=8)
+}
