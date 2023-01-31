@@ -146,6 +146,7 @@ decade_list<-decade_maps[21]
 do.call(grid.arrange, decade_list)
 
 ###Calculate latitudinal biomass percentiles, plot per decade
+#Kathy says not important
 install.packages("Hmisc")
 library(Hmisc)
 biomass_by_lat<-clean_w_season%>%
@@ -183,10 +184,33 @@ test2%>%
   geom_density(aes(COGy))+
   facet_wrap(~decade, nrow=3, ncol=3)
 
-##weighted quantiles 
-
 ###Survey data with depth, surface & bottom temperature, and Janet Nye's method of calculating lat/lon
+install.packages("matrixStats")
+library(matrixStats)
+grouped_center_bio <- function(clean_survey, ...){
+  clean_survey %>% 
+    group_by(comname, ...) %>% 
+    summarise(
+      # Un-weighted averages
+      total_biomass   = sum(biomass_kg),
+      avg_biomass     = mean(biomass_kg),
+      biomass_sd      = sd(biomass_kg),
+      # All below are weighted by biomass
+      avg_depth       = weightedMean(avgdepth, w = biomass_kg, na.rm = T),
+      avg_bot_temp    = weightedMean(bottemp, w = biomass_kg, na.rm = T),
+      avg_sur_temp    = weightedMean(surftemp, w = biomass_kg, na.rm = T),
+      avg_lat         = weightedMean(decdeg_beglat, w = biomass_kg, na.rm = T),
+      avg_lon         = weightedMean(decdeg_beglon, w = biomass_kg, na.rm = T),
+      depth_sd        = weightedSd(avgdepth, w = biomass_kg, na.rm = T),
+      temp_sd         = weightedSd(bottemp, w = biomass_kg, na.rm = T),
+      lat_sd          = weightedSd(decdeg_beglat, w = biomass_kg, na.rm = T),
+      lon_sd          = weightedSd(decdeg_beglon, w = biomass_kg, na.rm = T),
+      .groups = "drop") 
+}
 
-
-
+weighted_data<-grouped_center_bio(clean_survey, est_year)
+dec_data<-weighted_data%>%
+  select(comname, est_year, avg_depth, avg_bot_temp, avg_sur_temp)%>%
+  group_by(comname)%>%
+  nest()
 
