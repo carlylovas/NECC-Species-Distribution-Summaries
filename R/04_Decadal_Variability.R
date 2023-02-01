@@ -213,3 +213,83 @@ for(i in 1:66){
   ggsave(depth_plots[[i]], file = paste(filename,".pdf",sep=""),
          width=11, height=8)
 }
+
+#linear fit
+dec_data%>%
+  filter(comname == "atlantic herring")%>%
+  unnest(data)%>%
+  ggplot(aes(est_year, avg_depth))+
+  geom_point()+
+  geom_smooth(method="lm", se=FALSE, color="#00608A")+
+  theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
+  facet_wrap(~decade, ncol=5, scales="free_x")+
+  scale_x_continuous(breaks = seq(1970, 2020, by=2))+
+  scale_y_reverse()+
+  ggtitle("AMERICAN HERRING")+
+  ylab("Average Depth")+
+  xlab("Year")
+
+###bottom temp plots
+bottemp_df<-dec_data%>%
+  unnest(data)%>%
+  select(comname, est_year, avg_bot_temp, decade)%>%
+  group_by(comname)%>%
+  nest()
+nrow(bottemp_df)
+bottemp_plots<-vector("list",length=66)
+names(bottemp_plots)=paste(unique(dec_data$comname))
+
+for(i in 1:66){
+  print(i)
+  loop_df<-bottemp_df[i,]%>%
+    unnest(data)%>%
+    select(comname, est_year, avg_bot_temp, decade)%>%
+    group_by(comname)
+  
+  bottemp_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_bot_temp), na.rm=TRUE)+
+    geom_point()+
+    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
+    facet_wrap(~decade, ncol=5, scales="free_x")+
+    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
+    ggtitle(ggtitle(toupper(names(bottemp_plots)[i])))+
+    ylab("Average Bottom Temperature")+
+    xlab("Year")
+}
+  filename = paste('avg_bot_temp', unique(loop_df$comname), sep='_')
+  ggsave(bottemp_plots[[i]], file = paste(filename,".pdf",sep=""),
+         width=11, height=8)
+
+bt_list<-bottemp_plots[10]
+do.call(grid.arrange, bt_list)
+
+##surface temperature plots
+surtemp_df<-dec_data%>%
+  unnest(data)%>%
+  select(comname, est_year, avg_sur_temp, decade)%>%
+  group_by(comname)%>%
+  nest()
+nrow(surtemp_df)
+surtemp_plots<-vector("list",length=66)
+names(surtemp_plots)=paste(unique(dec_data$comname))
+
+for(i in 1:66){
+  print(i)
+  loop_df<-surtemp_df[i,]%>%
+    unnest(data)%>%
+    select(comname, est_year, avg_sur_temp, decade)%>%
+    group_by(comname)
+  
+  surtemp_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_sur_temp), na.rm=TRUE)+
+    geom_point()+
+    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
+    facet_wrap(~decade, ncol=5, scales="free_x")+
+    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
+    ggtitle(ggtitle(toupper(names(surtemp_plots)[i])))+
+    ylab("Average Surface Temperature")+
+    xlab("Year")
+
+filename = paste('avg_sur_temp', unique(loop_df$comname), sep='_')
+  ggsave(surtemp_plots[[i]], file = paste(filename,".pdf",sep=""),
+         width=11, height=8)
+}
+
