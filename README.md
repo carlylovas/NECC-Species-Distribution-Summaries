@@ -6,19 +6,50 @@ This repository supports analysis of the NOAA NMFS Northeast Fisheries Science C
 
 ## Navigating the Repo
 
-#DATA This folder contains the list of fishes included in the NECC study as well as the Rds and RData workspace associated with this project.
+#### Data
 
-#R This folder contains the prep code for cleaning the survey data (01_SurveyDataPrep.R), code for the NECC species distribution analysis (02_SpeciesDistAnalysis) and @carlylovas' workspace (NECC.R). Additionally, this folder contains an R script entitled helper_funcs.R which contains the code for three functions used in this analysis.
+This folder contains the list of fishes included in the NECC study as well as the Rds and RData workspace associated with this project.
 
-#TEMP_RESULTS There are two subfolders: Plot_maps and Tables. These folders contain output results from the above analysis. Plot_maps will contain graphs and distribution maps pertaining to 02_SpeciesDistAnaylsis and Tables contains multiple CSV files of outputs. Within Tables you will find three CSV files:
+#### R
 
-(1) NEFSC_YearSeasonDistributionSummaries.csv
-    This table contains the year-season center of latitude and longitude per species. Additionally, there are two columns including rate of change associated with the center of latitude and center of longitude, respectively. 
+This folder contains the prep code for cleaning the survey data `01_SurveyDataPrep.R`, code for the NECC species distribution analysis `02_SpeciesDistAnalysis`, code for plotting `03_Plotting_Mapping`. There are three additional scripts; code to explore decadal trends `04_Decadal_Variability`, @carlylovas' workspace `NECC.R`, and  `helper_funcs.R` which contains the code for three functions used in this analysis.
+
+#### Temp_Results
+
+There are three folders: **Plots**, **Maps** and **Tables**. These folders contain output results from the above analysis. 
+
+**Plots**
+
+There are two subfolders within **Plots**; `NECC_plots` and `Decadal_plots`. `NECC_plots` contains five plots depicting changes in center of latitude, seasonal distance, and rate of change. All are appropriately labeled. `Decadal_plots` contains three separate folders to house plots depicting changes in surface temperature, bottom temperature, and depth over time. 
+
+**Maps**
+
+There is currently one folder within **Maps**. `NECC_maps` show changes in Fall and Spring center of biomass for each species *per decade*. 
+
+**Tables**
+
+There are six CSV files within **Tables**
+
+`NEFSC_YearSeason_Center_of_Biomass.csv`
+ 
+This file contains the year-season center of latitude and longitude per species.
          
-(2) NEFSC_YearlyDistributionSummaries.csv
-    This table includes the changes in center of latitude and longtitude per species per year. Rate of change is also included. 
-         
-(3) seasonal_distance.csv (name subject to change)
-    This table includes the rate of change of distance (in meters) between the Spring and Fall center of gravity (lat and long) per species and the recorded number of observations. 
+`NEFSC_Yearly_Center_of_Biomass.csv`
+ 
+This file includes the changes in center of latitude and longtitude per species per year. 
 
-These folders and their contents are subject to change.
+`NEFSC_YearSeason_Rate_of_Change.csv`
+
+This file contains the rate of change for center of latitude and longitude (`slopeLat` and `slopeLon`, respectively) per species *per season*, along with the associated signficance values (p.value). 
+
+`NEFSC_Yearly_Rate_of_Change.csv`
+
+This file contains the rate of change for center of latitude and longitude (`slopeLat` and `slopeLon`, respectively) per speices, along with the associated signficance values (p.value).
+
+`Seasonal_Distance_CofBiomass.csv`
+
+This file contains the distance (in km) in which the center of biomass moved between spring and fall surveys per species, per year. 
+
+`Seasonal_Rate_Change.csv`
+
+This file contains the rate of which the distance between spring and fall center of biomass changed over time, per species. 
