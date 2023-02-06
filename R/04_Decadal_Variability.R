@@ -167,6 +167,9 @@ dec_data<-dec_data%>%
        slope = c(depth_slope:surf_slope),
        p = c(depth_p:surf_p))
 
+dec_data<-dec_data%>%
+  nest(p =c(depth_p:surf_p))
+
 ##depth plots
 dec_data%>%
   filter(comname == "acadian redfish")%>%

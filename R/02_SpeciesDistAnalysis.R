@@ -65,24 +65,40 @@ COG_wo_season<-COG_wo_season%>%
 COG_wo_season<-COG_wo_season%>%
   mutate(tidyLat=map(centerLat,broom::tidy),
          tidyLon=map(centerLon,broom::tidy),
+         glanceLat=map(centerLat,broom::glance),
+         glanceLon=map(centerLon,broom::glance),
          slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
-         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]),
+         pLat = glanceLat %>% map_dbl("p.value"),
+         pLon = glanceLon %>% map_dbl("p.value"))
 
 COG_w_season<-COG_w_season%>%
   mutate(tidyLat=map(centerLat,broom::tidy),
          tidyLon=map(centerLon,broom::tidy),
+         glanceLat=map(centerLat,broom::glance),
+         glanceLon=map(centerLon,broom::glance),
          slopeLat = tidyLat %>% map_dbl(function(x) x$estimate[2]),
-         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]))
+         slopeLon = tidyLon %>% map_dbl(function(x) x$estimate[2]),
+         pLat = glanceLat %>% map_dbl("p.value"),
+         pLon = glanceLon %>% map_dbl("p.value"))
 
 ##tidy datasets 
 clean_w_season<-COG_w_season%>%
   unnest(data)%>%
-  select("comname","est_year","season","COGy","COGx","slopeLat", "slopeLon")%>%
+  select("comname","est_year","season","COGy","COGx")%>%
+  distinct()
+
+season_slope<-COG_w_season%>%
+  select("comname", "season", "slopeLat", "slopeLon", "pLat", "pLon")%>%
   distinct()
 
 clean_wo_season<-COG_wo_season%>%
   unnest(data)%>%
-  select("comname","est_year","COGy","COGx","slopeLat", "slopeLon")%>%
+  select("comname","est_year","COGy","COGx")%>%
+  distinct()
+
+wo_season_slope<-COG_wo_season%>%
+  select("comname", "slopeLat", "slopeLon", "pLat", "pLon")%>%
   distinct()
 
 ####Calculate seasonal distance
@@ -145,47 +161,23 @@ season_dist_km<-season_dist_km%>%
 library(MASS)
 
 clean_w_season<-clean_w_season%>%
-  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx",
          "Common Name"="comname", "Year"="est_year", "Season"="season")
-write.csv(clean_w_season, "withSeason.csv", row.names = FALSE)
+write.csv(clean_w_season, "NEFSC_YearSeason_Center_of_Biomass.csv", row.names = FALSE)
+
+season_slope<-season_slope%>%
+  rename("Common Name" = "comname", "Season" = "season")
+write.csv(season_slope, "NEFSC_YearSeason_Rate_of_Change.csv")
 
 clean_wo_season<-COG_wo_season%>%
-  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx", "Slope (lat)"="slopeLat", "Slope (lon)"="slopeLon",
+  rename("Center of Latitude"="COGy", "Center of Longitude"="COGx",
          "Common Name"="comname", "Year"="est_year")
-write.csv(clean_wo_season, "withoutSeason.csv", row.names = FALSE)
+write.csv(clean_wo_season, "NEFSC_Yearly_Center_of_Biomass.csv", row.names = FALSE)
+
+wo_season_slope<-wo_season_slope%>%
+  rename("Common Name"="comname")
+write.csv(wo_season_slope, "NEFSC_Yearly_Rate_of_Change.csv")
 
 season_dist_km<-season_dist_km%>%
   select(comname, num_obs, slope)
 write.matrix(season_dist_km, "Seasonal_Rate_Change.csv", sep=",")
-
-
-####Additional analysis; pre- and post-2010
-pre2010<-clean_w_season%>%
-  filter(est_year<2009)%>%
-  select(comname, season, est_year, COGx, COGy)%>%
-  group_by(comname, season)%>%
-  nest()
-
-post2010<-clean_w_season%>%
-  filter(est_year>2009)%>%
-  select(comname,season,est_year,COGx,COGy)%>%
-  group_by(comname, season)%>%
-  nest()
-
-write.csv(post2010, "post_2010.csv", row.names = FALSE)
-write.csv(pre2010, "pre_2010.csv", row.names=FALSE)
-
-#pre2010 model
-pre2010<-pre2010%>%
-  mutate(lat_mod=map(data, species_lat_mod),
-         tidy_lat=map(lat_mod,broom::tidy),
-         glance=map(lat_mod, broom::glance),
-         slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
-
-#post2010 model
-post2010<-post2010%>%
-  mutate(lat_mod=map(data, species_lat_mod),
-         tidy_lat=map(lat_mod,broom::tidy),
-         glance=map(lat_mod, broom::glance),
-         slopeLat=tidy_lat%>%map_dbl(function(x) x$estimate[2]))
-
