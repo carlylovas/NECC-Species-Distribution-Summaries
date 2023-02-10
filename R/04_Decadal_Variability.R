@@ -1,88 +1,4 @@
 ##Examining distribution changes by decade##
-
-#####plotting seasonal migration patterns#
-dist_km<-Seasonal_Distance_CofBiomass
-dist_km%>%
-  filter(comname == "alewife") %>%
-  ggplot(aes(est_year, dist_km))+
-  geom_point()+
-  geom_line()+
-  geom_smooth(method="lm")+
-  theme_gmri()+
-  xlab("Year")+
-  ylab("Distance (km)")+
-  ggtitle("Migratory Distance of Alewife")+
-  scale_color_gmri()
-
-#season distance loopz
-dist_km<-dist_km%>%
-  group_by(comname)%>%
-  nest()
-n_dist<-nrow(dist_km)
-dist_plotlist<-vector("list", length = n_dist)
-names(dist_plotlist)=paste(dist_km$comname)
-str(dist_plotlist)
-
-for (i in 1:n_dist) {
-  print(i)
-  loop_df <- dist_km[i,] %>%
-    unnest(data) %>%
-    select(comname, est_year, dist_km) %>%
-    group_by(comname)
-  
-  dist_plotlist[[i]] <- ggplot(loop_df, aes(est_year, dist_km)) +
-    geom_point() +  
-    theme_gmri(legend.position="none")+
-    scale_color_gmri()+
-    ggtitle(names(dist_plotlist)[i]) +
-    geom_smooth(method = "lm")
-}
-
-list2 = dist_plotlist[c(1:4)]
-do.call(grid.arrange, c(list2, ncol = 2))
-list_3<-dist_plotlist[c("alewife", "scup", "smooth dogfish", "spiny dogfish")] #strong migrators 
-do.call(grid.arrange, c(list_3, ncol=2))
-
-#decadal maps with season
-world <- ne_countries(scale = "medium", returnclass = "sf")
-ggplot(data = world) +
-  geom_sf()+
-  coord_sf(crs="+init=epsg:4326")
-
-map_df<-clean_w_season%>%
-  mutate(decade = 10*est_year %/% 10)%>%
-  group_by(comname)%>%
-  nest()
-nrow(map_df)
-decade_maps<-vector("list",length=41)
-names(decade_maps)=paste(unique(clean_w_season$comname))
-
-for(i in 1:41){
-  print(i)
-  loop_df<-map_df[i,]%>%
-    unnest(data)%>%
-    select(comname, COGx, COGy,season, decade)%>%
-    group_by(comname)
-  
-  decade_maps[[i]]<-ggplot(data=world)+
-    geom_sf()+
-    coord_sf(xlim=c(-80, -65), ylim=c(30,47))+
-    geom_point(data=loop_df, aes(x=COGx,y=COGy,color=season))+
-    theme_gmri()+
-    ggtitle(toupper(names(decade_maps)[i]))+
-    ylab("Center of Latitude")+
-    xlab("Center of Longitude")+
-    scale_y_continuous(breaks = c(36,40,44)) + scale_x_continuous(breaks = c(-78,-72,-66)) +
-    facet_wrap(~decade, ncol=5)
-  
-  filename = paste('Center_of_Biomass', unique(loop_df$comname), sep='_')
-  ggsave(decade_maps[[i]], file= paste("Temp_Results/Maps/", filename,".pdf",sep=""),
-         width=6.5, height=4.5)
-}
-
-decade_list<-decade_maps[21]
-do.call(grid.arrange, decade_list)
-
 ###Survey data with depth, surface & bottom temperature, and Janet Nye's method of calculating lat/lon
 install.packages("matrixStats")
 library(matrixStats)
@@ -107,11 +23,11 @@ grouped_center_bio <- function(clean_survey, ...){
       .groups = "drop") 
 }
 
-weighted_data<-grouped_center_bio(clean_survey, est_year)
+weighted_data<-grouped_center_bio(clean_survey, est_year, season)
 dec_data<-weighted_data%>%
-  select(comname, est_year, avg_depth, avg_bot_temp, avg_sur_temp)%>%
+  select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
   mutate(decade = 10*est_year %/% 10)%>%
-  group_by(comname)%>%
+  group_by(comname, season)%>%
   nest()
 
 ##linear model functions
@@ -124,175 +40,192 @@ bot_temp_mod<-function(df){
 sur_temp_mod<-function(df){
   lm(avg_sur_temp~est_year, data=df)
 }
-
+avg_lat_mod<-function(df){
+  lm(avg_lat~est_year, data=df)
+}
+avg_lon_mod<-function(df){
+  lm(avg_lon~est_year, data=df)
+}
 slope<-function(x) x$estimate[2]
 
 dec_data<-dec_data%>%
   mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
          bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
-         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)))
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))
+
 dec_data<-dec_data%>%
-  nest(models = c(depth_mod:sur_temp_mod))
+  nest(models = c(depth_mod:avg_lon_mod))
+
+library(readr)
+species <- read_csv("Data/species for dist analyses.csv")
+species<-species%>%
+  rename(comname = ...1)
+species<-tolower(species$comname)
+
 dec_data<-dec_data%>%
-  filter(comname %in% c(
-    "acadian redfish"          ,"american plaice"          ,"atlantic cod"            , "atlantic herring"        ,
-    "black sea bass"           ,"blackbelly rosefish"      ,"buckler dory"            , "butterfish"              ,
-    "cunner"                   ,"fawn cusk-eel"            ,"goosefish"               , "haddock"                 ,
-    "little skate"             ,"longhorn sculpin"         ,"northern searobin"       , "offshore hake"           ,
-    "red hake"                 ,"scup"                     ,"sea raven"               , "silver hake"             ,
-    "smooth skate"             ,"thorny skate"             ,"windowpane flounder"     , "winter flounder"         ,
-    "witch flounder"           ,"yellowtail flounder"      ,"blueback herring"        , "fourspot flounder"       ,
-    "spotted hake"             ,"atlantic wolffish"        ,"ocean pout"              , "white hake"              ,
-    "chain dogfish"            ,"rosette skate"            ,"weakfish"                , "american shad"           ,
-    "cusk"                     ,"winter skate"             ,"atlantic halibut"        , "pollock"                 ,
-    "round herring"            ,"bluefish"                 ,"spiny dogfish"           , "clearnose skate"         ,
-    "atlantic mackerel"        ,"atlantic thread herring"  ,"striped bass"            , "spanish sardine"         ,
-    "spot"                     ,"barndoor skate"           ,"summer flounder"         , "atlantic croaker"        ,
-    "smooth dogfish"           ,"northern kingfish"        ,"roughtail stingray"      , "atlantic spadefish"      ,
-    "southern kingfish"        ,"atlantic angel shark"     ,"greater amberjack"       , "bullnose ray"            ,
-    "spanish mackerel"         ,"spiny butterfly ray"      ,"smooth butterfly ray"    , "cownose ray"             ,
-    "sand tiger"               ,"sandbar shark"            ,"atlantic sharpnose shark", "atlantic sturgeon"  
-  ))
-##missing 2
+  filter(comname %in% species)
 
 ##include and nest all stats
 dec_data<-dec_data%>%
   unnest(models)%>%
-  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),
-         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),
-         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope),
-         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"))%>%
-  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod),
-       tidy_glance = c(depth_tidy:surf_glance),
-       slope = c(depth_slope:surf_slope),
-       p = c(depth_p:surf_p))
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-dec_data<-dec_data%>%
-  nest(p =c(depth_p:surf_p))
+#WITH season####
+decadal_w_season<-dec_data
 
-##depth plots
-dec_data%>%
-  filter(comname == "acadian redfish")%>%
-  unnest(data)%>%
-  ggplot(aes(est_year, avg_depth))+
-  geom_point()+
-  theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
-  facet_wrap(~decade, ncol=5, scales="free_x")+
-  scale_x_continuous(breaks = seq(1970, 2020, by=2))+
-  scale_y_reverse()+
-  ggtitle("Average Depth of Acadian Redfish")+
-  ylab("Average Depth")+
-  xlab("Year")
-
-##depth plot loop
-depth_df<-dec_data%>%
-  unnest(data)%>%
-  select(comname, est_year, avg_depth, decade)%>%
+#WITHOUT season####
+no_season<-weighted_data%>%
+  select(comname, est_year,avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  mutate(decade = 10*est_year %/% 10)%>%
+  filter(comname %in% species)%>%
   group_by(comname)%>%
   nest()
 
-nrow(depth_df)
-depth_plots<-vector("list",length=66)
-names(depth_plots)=paste(unique(dec_data$comname))
+no_season<-no_season%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))%>%
+  nest(models = c(depth_mod:avg_lon_mod))  
 
-for(i in 1:66){
-  print(i)
-  loop_df<-depth_df[i,]%>%
-    unnest(data)%>%
-    select(comname, est_year, avg_depth, decade)%>%
-    group_by(comname)
-  
-  depth_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_depth))+
-    geom_point()+
-    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
-    facet_wrap(~decade, ncol=5, scales="free_x")+
-    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
-    scale_y_reverse()+
-    ggtitle(ggtitle(toupper(names(depth_plots)[i])))+
-    ylab("Average Depth")+
-    xlab("Year")
-  
-  filename = paste('average_depth', unique(loop_df$comname), sep='_')
-  ggsave(depth_plots[[i]], file = paste(filename,".pdf",sep=""),
-         width=11, height=8)
-}
+decadal_no_season<-no_season%>%
+  unnest(models)%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-#linear fit
-dec_data%>%
-  filter(comname == "atlantic herring")%>%
-  unnest(data)%>%
-  ggplot(aes(est_year, avg_depth))+
-  geom_point()+
-  geom_smooth(method="lm", se=FALSE, color="#00608A")+
-  theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
-  facet_wrap(~decade, ncol=5, scales="free_x")+
-  scale_x_continuous(breaks = seq(1970, 2020, by=2))+
-  scale_y_reverse()+
-  ggtitle("AMERICAN HERRING")+
-  ylab("Average Depth")+
-  xlab("Year")
+#2000-2009 WITH season
+pre2010season<-weighted_data%>%
+  filter(est_year %in% c(2000:2009))%>%
+  drop_na()%>%
+  select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  filter(comname %in% species)%>%
+  group_by(comname, season)%>%
+  nest()%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, possibly(broom::glance), NA), surf_glance = map(sur_temp_mod, possibly(broom:: glance), NA),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-###bottom temp plots
-bottemp_df<-dec_data%>%
-  unnest(data)%>%
-  select(comname, est_year, avg_bot_temp, decade)%>%
+#2000-2009 WITHOUT season
+pre2010<-weighted_data%>%
+  filter(est_year %in% c(2000:2009))%>%
+  select(comname, est_year, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  filter(comname %in% species)%>%
   group_by(comname)%>%
-  nest()
-nrow(bottemp_df)
-bottemp_plots<-vector("list",length=66)
-names(bottemp_plots)=paste(unique(dec_data$comname))
+  nest()%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-for(i in 1:66){
-  print(i)
-  loop_df<-bottemp_df[i,]%>%
-    unnest(data)%>%
-    select(comname, est_year, avg_bot_temp, decade)%>%
-    group_by(comname)
-  
-  bottemp_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_bot_temp), na.rm=TRUE)+
-    geom_point()+
-    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
-    facet_wrap(~decade, ncol=5, scales="free_x")+
-    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
-    ggtitle(ggtitle(toupper(names(bottemp_plots)[i])))+
-    ylab("Average Bottom Temperature")+
-    xlab("Year")
-}
-  filename = paste('avg_bot_temp', unique(loop_df$comname), sep='_')
-  ggsave(bottemp_plots[[i]], file = paste(filename,".pdf",sep=""),
-         width=11, height=8)
+#2010 onward WITH season
+post2010season<-weighted_data%>%
+  filter(est_year %in% c(2010:2020))%>%
+  select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  filter(comname %in% species)%>%
+  group_by(comname, season)%>%
+  nest()%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-bt_list<-bottemp_plots[10]
-do.call(grid.arrange, bt_list)
-
-##surface temperature plots
-surtemp_df<-dec_data%>%
-  unnest(data)%>%
-  select(comname, est_year, avg_sur_temp, decade)%>%
+#2010 onward WITHOUT season
+post2010<-weighted_data%>%
+  filter(est_year %in% c(2010:2020))%>%
+  select(comname, est_year,avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  filter(comname %in% species)%>%
   group_by(comname)%>%
-  nest()
-nrow(surtemp_df)
-surtemp_plots<-vector("list",length=66)
-names(surtemp_plots)=paste(unique(dec_data$comname))
+  nest()%>%
+  mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
+         bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
+         sur_temp_mod = map(data, possibly(sur_temp_mod, NA)),
+         avg_lat_mod  = map(data, possibly(avg_lat_mod, NA)),
+         avg_lon_mod  = map(data, possibly(avg_lon_mod, NA)))%>%
+  mutate(depth_tidy = map(depth_mod, broom::tidy), bt_tidy = map(bot_temp_mod, broom::tidy), surf_tidy = map(sur_temp_mod, broom:: tidy),lat_tidy = map(avg_lat_mod, broom::tidy), lon_tidy = map(avg_lon_mod, broom:: tidy),
+         depth_glance = map(depth_mod, broom::glance), bt_glance = map(bot_temp_mod, broom::glance), surf_glance = map(sur_temp_mod, broom:: glance),lat_glance = map(avg_lat_mod, broom::glance), lon_glance = map(avg_lon_mod, broom:: glance),
+         depth_slope = map(depth_tidy, slope), bt_slope = map(bt_tidy, slope), surf_slope = map(surf_tidy, slope), lat_slope = map(lat_tidy, slope), lon_slope = map(lon_tidy, slope),
+         depth_p = depth_glance %>% map_dbl("p.value"), bt_p = bt_glance %>% map_dbl("p.value"), surf_p = surf_glance %>% map_dbl("p.value"), lat_p = lat_glance %>% map_dbl("p.value"), lon_p = lon_glance %>% map_dbl("p.value"))%>%
+  nest(models = c(depth_mod, bot_temp_mod, sur_temp_mod, avg_lat_mod, avg_lon_mod),
+       tidy_glance = c(depth_tidy:lon_glance),
+       slope = c(depth_slope:lon_slope),
+       p = c(depth_p:lon_p))
 
-for(i in 1:66){
-  print(i)
-  loop_df<-surtemp_df[i,]%>%
-    unnest(data)%>%
-    select(comname, est_year, avg_sur_temp, decade)%>%
-    group_by(comname)
-  
-  surtemp_plots[[i]]<- ggplot(data=loop_df,aes(est_year, avg_sur_temp), na.rm=TRUE)+
-    geom_point()+
-    theme_gmri(axis.text.x = element_text(size = 9, angle = 90))+
-    facet_wrap(~decade, ncol=5, scales="free_x")+
-    scale_x_continuous(breaks = seq(1970, 2020, by=2))+
-    ggtitle(ggtitle(toupper(names(surtemp_plots)[i])))+
-    ylab("Average Surface Temperature")+
-    xlab("Year")
+##slope tables
+YearSeasonSlopes<-decadal_w_season%>%
+  select(comname, season, slope, p)%>%
+  unnest(slope)%>%
+  unnest(p)
+write.csv(YearSeasonSlopes, "YearSeasonSlopes.csv")
 
-filename = paste('avg_sur_temp', unique(loop_df$comname), sep='_')
-  ggsave(surtemp_plots[[i]], file = paste(filename,".pdf",sep=""),
-         width=11, height=8)
-}
+YearlySlopes<-decadal_no_season%>%
+  select(comname, slope, p)%>%
+  unnest(slope)%>%
+  unnest(p)
+write.csv(YearlySlopes, "YearlySlopes.csv")
+
+pre2010_with_season<-pre2010season%>%
+  select(comname, season, slope, p)%>%
+  unnest(slope)%>%
+  unnest(p)
+write.csv(pre2010_with_season, "pre2010YearSeasonSlopes.csv")
+
+pre2010_no_season<-pre2010%>%
+  select(comname, slope, p)%>%
+  unnest(slope)%>%
+  unnest(p)
+write.csv(pre2010_no_season, "pre2010YearlySlopes.csv")
+
+post2010_with_season<-post2010season%>%
+  select(comname, season, slope, p)%>%
+  unnest(c(slope, p))
+write.csv(post2010_with_season, "post2010YearSeasonSlopes.csv")
+
+post2010_no_season<-post2010%>%
+  select(comname, slope, p)%>%
+  unnest(c(slope, p))
+write.csv(post2010_no_season, "post2010YearlySlopes.csv")
 
