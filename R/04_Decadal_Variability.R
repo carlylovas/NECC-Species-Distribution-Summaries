@@ -195,37 +195,38 @@ post2010<-weighted_data%>%
        p = c(depth_p:lon_p))
 
 ##slope tables
+library(MASS)
 YearSeasonSlopes<-decadal_w_season%>%
-  select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p)%>%
   unnest(slope)%>%
   unnest(p)
-write.csv(YearSeasonSlopes, "YearSeasonSlopes.csv")
+write.matrix(YearSeasonSlopes, "YearSeasonSlopes.csv", sep=",")
 
 YearlySlopes<-decadal_no_season%>%
-  select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p)%>%
   unnest(slope)%>%
   unnest(p)
-write.csv(YearlySlopes, "YearlySlopes.csv")
+write.matrix(YearlySlopes, "YearlySlopes.csv", sep=",")
 
 pre2010_with_season<-pre2010season%>%
-  select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p)%>%
   unnest(slope)%>%
   unnest(p)
-write.csv(pre2010_with_season, "pre2010YearSeasonSlopes.csv")
+write.matrix(pre2010_with_season, "pre2010YearSeasonSlopes.csv", sep=",")
 
 pre2010_no_season<-pre2010%>%
-  select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p)%>%
   unnest(slope)%>%
   unnest(p)
-write.csv(pre2010_no_season, "pre2010YearlySlopes.csv")
+write.matrix(pre2010_no_season, "pre2010YearlySlopes.csv", sep=",")
 
 post2010_with_season<-post2010season%>%
-  select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p)%>%
   unnest(c(slope, p))
-write.csv(post2010_with_season, "post2010YearSeasonSlopes.csv")
+write.matrix(post2010_with_season, "post2010YearSeasonSlopes.csv", sep=",")
 
 post2010_no_season<-post2010%>%
-  select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p)%>%
   unnest(c(slope, p))
-write.csv(post2010_no_season, "post2010YearlySlopes.csv")
+write.matrix(post2010_no_season, "post2010YearlySlopes.csv", sep=",")
 
