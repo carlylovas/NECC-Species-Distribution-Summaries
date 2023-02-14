@@ -24,12 +24,13 @@ grouped_center_bio <- function(clean_survey, ...){
 }
 
 weighted_data<-grouped_center_bio(clean_survey, est_year, season)
-dec_data<-weighted_data%>%
+weighted_data<-weighted_data%>%
+  mutate(decade = 10*est_year %/% 10)
+ dec_data<-weighted_data%>%
   select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
   mutate(decade = 10*est_year %/% 10)%>%
   group_by(comname, season)%>%
   nest()
-
 ##linear model functions
 depth_mod<-function(df){
   lm(avg_depth~est_year, data=df)
@@ -48,6 +49,12 @@ avg_lon_mod<-function(df){
 }
 slope<-function(x) x$estimate[2]
 
+count<-function(df){
+  temp<-df%>%
+    drop_na()%>%
+    nrow()
+}
+
 dec_data<-dec_data%>%
   mutate(depth_mod    = map(data, possibly(depth_mod, NA)),
          bot_temp_mod = map(data, possibly(bot_temp_mod, NA)),
@@ -60,7 +67,7 @@ dec_data<-dec_data%>%
 
 library(readr)
 species <- read_csv("Data/species for dist analyses.csv")
-species<-species%>%
+species<-species_for_dist_analyses%>%
   rename(comname = ...1)
 species<-tolower(species$comname)
 
@@ -81,6 +88,8 @@ dec_data<-dec_data%>%
 
 #WITH season####
 decadal_w_season<-dec_data
+decadal_w_season<-decadal_w_season%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
 #WITHOUT season####
 no_season<-weighted_data%>%
@@ -108,8 +117,10 @@ decadal_no_season<-no_season%>%
        tidy_glance = c(depth_tidy:lon_glance),
        slope = c(depth_slope:lon_slope),
        p = c(depth_p:lon_p))
+decadal_no_season<-decadal_no_season%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
-#2000-2009 WITH season
+#2000-2009 WITH season####
 pre2010season<-weighted_data%>%
   filter(est_year %in% c(2000:2009))%>%
   drop_na()%>%
@@ -130,8 +141,10 @@ pre2010season<-weighted_data%>%
        tidy_glance = c(depth_tidy:lon_glance),
        slope = c(depth_slope:lon_slope),
        p = c(depth_p:lon_p))
+pre2010season<-pre2010season%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
-#2000-2009 WITHOUT season
+#2000-2009 WITHOUT season####
 pre2010<-weighted_data%>%
   filter(est_year %in% c(2000:2009))%>%
   select(comname, est_year, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
@@ -151,8 +164,10 @@ pre2010<-weighted_data%>%
        tidy_glance = c(depth_tidy:lon_glance),
        slope = c(depth_slope:lon_slope),
        p = c(depth_p:lon_p))
+pre2010<-pre2010%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
-#2010 onward WITH season
+#2010 onward WITH season####
 post2010season<-weighted_data%>%
   filter(est_year %in% c(2010:2020))%>%
   select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
@@ -172,8 +187,10 @@ post2010season<-weighted_data%>%
        tidy_glance = c(depth_tidy:lon_glance),
        slope = c(depth_slope:lon_slope),
        p = c(depth_p:lon_p))
+post2010season<-post2010season%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
-#2010 onward WITHOUT season
+#2010 onward WITHOUT season####
 post2010<-weighted_data%>%
   filter(est_year %in% c(2010:2020))%>%
   select(comname, est_year,avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
@@ -193,40 +210,42 @@ post2010<-weighted_data%>%
        tidy_glance = c(depth_tidy:lon_glance),
        slope = c(depth_slope:lon_slope),
        p = c(depth_p:lon_p))
+post2010<-post2010%>%
+  mutate(num_obs = map(data, possibly(count, NA)))
 
-##slope tables
+##slope tables####
 library(MASS)
 YearSeasonSlopes<-decadal_w_season%>%
-  dplyr::select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p, num_obs)%>%
   unnest(slope)%>%
   unnest(p)
 write.matrix(YearSeasonSlopes, "YearSeasonSlopes.csv", sep=",")
 
 YearlySlopes<-decadal_no_season%>%
-  dplyr::select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p, num_obs)%>%
   unnest(slope)%>%
   unnest(p)
 write.matrix(YearlySlopes, "YearlySlopes.csv", sep=",")
 
 pre2010_with_season<-pre2010season%>%
-  dplyr::select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p, num_obs)%>%
   unnest(slope)%>%
   unnest(p)
 write.matrix(pre2010_with_season, "pre2010YearSeasonSlopes.csv", sep=",")
 
 pre2010_no_season<-pre2010%>%
-  dplyr::select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p, num_obs)%>%
   unnest(slope)%>%
   unnest(p)
 write.matrix(pre2010_no_season, "pre2010YearlySlopes.csv", sep=",")
 
 post2010_with_season<-post2010season%>%
-  dplyr::select(comname, season, slope, p)%>%
+  dplyr::select(comname, season, slope, p, num_obs)%>%
   unnest(c(slope, p))
 write.matrix(post2010_with_season, "post2010YearSeasonSlopes.csv", sep=",")
 
 post2010_no_season<-post2010%>%
-  dplyr::select(comname, slope, p)%>%
+  dplyr::select(comname, slope, p, num_obs)%>%
   unnest(c(slope, p))
 write.matrix(post2010_no_season, "post2010YearlySlopes.csv", sep=",")
 
