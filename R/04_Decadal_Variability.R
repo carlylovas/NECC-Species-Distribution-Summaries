@@ -26,7 +26,7 @@ grouped_center_bio <- function(clean_survey, ...){
 weighted_data<-grouped_center_bio(clean_survey, est_year, season)
 weighted_data<-weighted_data%>%
   mutate(decade = 10*est_year %/% 10)
- dec_data<-weighted_data%>%
+dec_data<-weighted_data%>%
   select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
   mutate(decade = 10*est_year %/% 10)%>%
   group_by(comname, season)%>%
@@ -248,4 +248,181 @@ post2010_no_season<-post2010%>%
   dplyr::select(comname, slope, p, num_obs)%>%
   unnest(c(slope, p))
 write.matrix(post2010_no_season, "post2010YearlySlopes.csv", sep=",")
+
+###ANOVA####
+subset1<-weighted_data%>%
+  filter(est_year %in% c(1970:2009))%>%
+  mutate(group = as.character("group_1"))
+subset2<-weighted_data%>%
+  filter(est_year %in% c(2000:2009))%>%
+  mutate(group = as.character("group_2"))
+subset3<-weighted_data%>%
+  filter(est_year %in% c(2010:2019))%>%
+  mutate(group = as.character("group_3"))
+
+t_test<-bind_rows(subset1, subset2, subset3)
+t_test<-t_test%>%
+  filter(comname %in% species)
+
+#unequal variance test####
+#1970-2009 vs 2010-2019 [no season]
+t_test_1<-t_test%>%
+  filter(group %in% c("group_1", "group_3"))%>%
+  group_by(comname)%>%
+  nest()%>%
+  mutate(num_obs      = map(data, possibly(count, NA)))%>%
+  mutate(bart_sst     = map(data, possibly(bart_sst, NA)),
+         bart_bt      = map(data, possibly(bart_bt, NA)),
+         bart_depth   = map(data, possibly(bart_depth, NA)),
+         bart_lat     = map(data, possibly(bart_lat, NA)),
+         bart_lon     = map(data, possibly(bart_lon, NA)))%>%
+  mutate(welch_sst    = map(data, possibly(welch_sst, NA)),
+         welch_bt     = map(data, possibly(welch_bt,NA)),
+         welch_depth  = map(data, possibly(welch_depth, NA)),
+         welch_lat    = map(data, possibly(welch_lat, NA)),
+         welch_lon    = map(data, possibly(welch_lon, NA)))%>%
+  mutate(tidy_bart_sst     = map(bart_sst,   broom::tidy),
+         tidy_bart_bt      = map(bart_bt,    broom::tidy),
+         tidy_bart_depth   = map(bart_depth, broom::tidy),
+         tidy_bart_lat     = map(bart_lat,   broom::tidy),
+         tidy_bart_lon     = map(bart_lon,   broom::tidy))%>%
+  mutate(tidy_welch_sst     = map(welch_sst,   broom::tidy),
+         tidy_welch_bt      = map(welch_bt,    broom::tidy),
+         tidy_welch_depth   = map(welch_depth, broom::tidy),
+         tidy_welch_lat     = map(welch_lat,   broom::tidy),
+         tidy_welch_lon     = map(welch_lon,   broom::tidy))%>%
+  mutate(bart_sst_p        = map(tidy_bart_sst,   p),
+         bart_bt_p         = map(tidy_bart_bt,    p),
+         bart_depth_p      = map(tidy_bart_depth, p),
+         bart_lat_p        = map(tidy_bart_lat,   p),
+         bart_lon_p        = map(tidy_bart_lon,   p))%>%
+  mutate(welch_sst_p       = map(tidy_welch_sst, p),
+         welch_bt_p        = map(tidy_welch_bt, p),
+         welch_depth_p     = map(tidy_welch_depth, p),
+         welch_lat_p       = map(tidy_welch_lat, p),
+         welch_lon_p       = map(tidy_welch_lon, p))%>%
+  nest(bartlett_test  = c(bart_sst:bart_lon),
+       welch_t_test   = c(welch_sst:welch_lon),
+       tidy           = c(tidy_bart_sst:tidy_welch_lon),
+       bart_p_values  = c(bart_sst_p:bart_lon_p),
+       welch_p_values = c(welch_sst_p:welch_lon_p))
+
+
+#2000-2009 vs 2010-2019
+t_test_2<-t_test%>%
+  filter(group %in% c("group_2", "group_3"))%>%
+  group_by(comname)%>%
+  nest()%>%
+  mutate(num_obs      = map(data, possibly(count, NA)))%>%
+  mutate(bart_sst     = map(data, possibly(bart_sst, NA)),
+         bart_bt      = map(data, possibly(bart_bt, NA)),
+         bart_depth   = map(data, possibly(bart_depth, NA)),
+         bart_lat     = map(data, possibly(bart_lat, NA)),
+         bart_lon     = map(data, possibly(bart_lon, NA)))%>%
+  mutate(welch_sst    = map(data, possibly(welch_sst, NA)),
+         welch_bt     = map(data, possibly(welch_bt,NA)),
+         welch_depth  = map(data, possibly(welch_depth, NA)),
+         welch_lat    = map(data, possibly(welch_lat, NA)),
+         welch_lon    = map(data, possibly(welch_lon, NA)))%>%
+  mutate(tidy_bart_sst     = map(bart_sst,   broom::tidy),
+         tidy_bart_bt      = map(bart_bt,    broom::tidy),
+         tidy_bart_depth   = map(bart_depth, broom::tidy),
+         tidy_bart_lat     = map(bart_lat,   broom::tidy),
+         tidy_bart_lon     = map(bart_lon,   broom::tidy))%>%
+  mutate(tidy_welch_sst     = map(welch_sst,   broom::tidy),
+         tidy_welch_bt      = map(welch_bt,    broom::tidy),
+         tidy_welch_depth   = map(welch_depth, broom::tidy),
+         tidy_welch_lat     = map(welch_lat,   broom::tidy),
+         tidy_welch_lon     = map(welch_lon,   broom::tidy))%>%
+  mutate(bart_sst_p        = map(tidy_bart_sst,   p),
+         bart_bt_p         = map(tidy_bart_bt,    p),
+         bart_depth_p      = map(tidy_bart_depth, p),
+         bart_lat_p        = map(tidy_bart_lat,   p),
+         bart_lon_p        = map(tidy_bart_lon,   p))%>%
+  mutate(welch_sst_p       = map(tidy_welch_sst, p),
+         welch_bt_p        = map(tidy_welch_bt, p),
+         welch_depth_p     = map(tidy_welch_depth, p),
+         welch_lat_p       = map(tidy_welch_lat, p),
+         welch_lon_p       = map(tidy_welch_lon, p))%>%
+  nest(bartlett_test  = c(bart_sst:bart_lon),
+       welch_anova    = c(welch_sst:welch_lon),
+       tidy           = c(tidy_bart_sst:tidy_welch_lon),
+       bart_p_values  = c(bart_sst_p:bart_lon_p),
+       welch_p_values = c(welch_sst_p:welch_lon_p))
+
+##Clean Welch's ANOVA
+Welch_TTest_1<-welch_test_1%>%
+  select(comname, p_values, num_obs)%>%
+  unnest(p_values)%>%
+  drop_na()%>%
+  mutate(bart_sst_p        = as.numeric(bart_sst_p),
+         welch_sst_p       = as.numeric(welch_sst_p),
+         bart_bt_p         = as.numeric(bart_bt_p),
+         welch_bt_p        = as.numeric(welch_bt_p),
+         bart_depth_p      = as.numeric(bart_depth_p),
+         welch_depth_p     = as.numeric(welch_depth_p),
+         bart_lat_p        = as.numeric(bart_lat_p),
+         welch_lat_p       = as.numeric(welch_lat_p),
+         bart_lon_p        = as.numeric(bart_lon_p),
+         welch_lon_p       = as.numeric(welch_lon_p))%>%
+  relocate(welch_sst_p, .after =bart_sst_p)%>%
+  relocate(welch_bt_p, .after=bart_bt_p)%>%
+  relocate(welch_depth_p, .after=bart_depth_p)%>%
+  relocate(welch_lat_p, .after=bart_lat_p)%>%
+  relocate(welch_lon_p, .after=bart_lon_p)%>%
+  mutate(across(where(is.numeric), round, 3))
+
+Welch_TTest_2<-welch_test_2%>%
+  select(comname, p_values, num_obs)%>%
+  unnest(p_values)%>%
+  drop_na()%>%
+  mutate(bart_sst_p        = as.numeric(bart_sst_p),
+         welch_sst_p       = as.numeric(welch_sst_p),
+         bart_bt_p         = as.numeric(bart_bt_p),
+         welch_bt_p        = as.numeric(welch_bt_p),
+         bart_depth_p      = as.numeric(bart_depth_p),
+         welch_depth_p     = as.numeric(welch_depth_p),
+         bart_lat_p        = as.numeric(bart_lat_p),
+         welch_lat_p       = as.numeric(welch_lat_p),
+         bart_lon_p        = as.numeric(bart_lon_p),
+         welch_lon_p       = as.numeric(welch_lon_p))%>%
+  relocate(welch_sst_p, .after =bart_sst_p)%>%
+  relocate(welch_bt_p, .after=bart_bt_p)%>%
+  relocate(welch_depth_p, .after=bart_depth_p)%>%
+  relocate(welch_lat_p, .after=bart_lat_p)%>%
+  relocate(welch_lon_p, .after=bart_lon_p)%>%
+  mutate(across(where(is.numeric), round, 3))
+
+#MEANS####
+decadal_means<-t_test%>%
+  group_by(comname, group)%>%
+  nest()%>%
+  mutate(mean_sst   = as.numeric(map(data, avg_sst)),
+         mean_bt    = as.numeric(map(data, avg_bt)),
+         mean_depth = as.numeric(map(data, mean_depth)),
+         mean_lat   = as.numeric(map(data, mean_lat)),
+         mean_lon   = as.numeric(map(data, mean_lon)))
+
+group_1_means<-decadal_means%>%
+  filter(group == "group_1")%>%
+  select(comname, mean_sst:mean_lon)%>%
+  group_by(comname)%>%
+  mutate(across(where(is.numeric), round, 3))
+group_2_means<-decadal_means%>%
+  filter(group == "group_2")%>%
+  select(comname, mean_sst:mean_lon)%>%
+  group_by(comname)%>%
+  mutate(across(where(is.numeric), round, 3))
+group_3_means<-decadal_means%>%
+  filter(group == "group_3")%>%
+  select(comname, mean_sst:mean_lon)%>%
+  group_by(comname)%>%
+  mutate(across(where(is.numeric), round, 3))
+
+library(MASS)
+write.matrix(Welch_TTest_1, "Welch_t_test_1.csv", sep=",")
+write.matrix(Welch_TTest_2, "Welch_t_test_2.csv", sep=",")
+write.csv(group_1_means, "Group_1_means.csv")
+write.csv(group_2_means, "Group_2_means.csv")
+write.csv(group_3_means, "Group_3_means.csv")
 
