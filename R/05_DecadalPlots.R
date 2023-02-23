@@ -84,25 +84,25 @@ mean_lon<-function(df){
 
 #maps####
 map_df<-dec_data%>%
-  select(comname, season, data)%>%
+  select(comname, data)%>%
   unnest(data)%>%
   group_by(comname)%>%
   nest()
 nrow(map_df)
-maps<-vector("list",length=55)
+maps<-vector("list",length=56)
 names(maps)=paste(unique(map_df$comname))
 
-for(i in 1:55){
+for(i in 1:56){
   print(i)
   loop_df<-map_df[i,]%>%
     unnest(data)%>%
-    select(comname, avg_lat, avg_lon,season, decade)%>%
+    select(comname, avg_lat, avg_lon, decade)%>%
     group_by(comname)
   
   maps[[i]]<-ggplot(data=world)+
     geom_sf()+
     coord_sf(xlim=c(-80, -65), ylim=c(30,47))+
-    geom_point(data=loop_df, aes(x=avg_lon,y=avg_lat,color=season))+
+    geom_point(data=loop_df, aes(x=avg_lon,y=avg_lat))+
     theme_gmri()+
     ggtitle(toupper(names(maps)[i]))+
     ylab("Center of Latitude")+
@@ -112,14 +112,14 @@ for(i in 1:55){
 }
 #average lat####
 lat_df<-dec_data%>%
-  select(comname, season, data)%>%
+  select(comname, data)%>%
   unnest(data)%>%
   group_by(comname)%>%
   nest()
-lat<-vector("list", length = 55)
+lat<-vector("list", length = 56)
 names(lat)=paste(unique(lat_df$comname))
 
-for(i in 1:55){
+for(i in 1:56){
   print(i)
   loop_df<-lat_df[i,]%>%
     unnest(data)%>%
@@ -153,8 +153,9 @@ for(i in 1:55){
   lat[[i]]<- ggplot(data=loop_df, aes(x=est_year, y=avg_lat))+
     geom_point(size=0.5)+
     theme_gmri(axis.title = element_blank(),
+               plot.title = element_text(size = 11),
                axis.text.y = element_text(size=10))+
-    ggtitle("Average Latitude")+
+    ggtitle(toupper(names(lat)[i]))+
     geom_line(data=group1, aes(x=est_year, y=as.numeric(overall_lat)), color="#EACA00", linewidth=0.75)+
     geom_line(data=group2, aes(x=est_year, y=as.numeric(overall_lat)), color="#00608A", linewidth=0.75)+
     geom_line(data=group3, aes(x=est_year, y=as.numeric(overall_lat)), color="#EA4F12", linewidth=0.75)
@@ -377,3 +378,8 @@ for(i in 1:55){
   ggsave(species_profiles[[i]], file = paste(filename,".pdf",sep=""),
          width=9, height=16) 
 }
+
+##all species lats
+species_lat_list = lat[c(1:56)]
+species_lat<-marrangeGrob(species_lat_list, nrow=5, ncol=3)
+ggsave("lat_multipage.pdf", species_lat, height = 11, width=9, units = "in")

@@ -1,4 +1,5 @@
-###BASED ON TOTAL ANNUAL AVERAGES###
+###SEASONAL MEANS AVERAGED TO YEAR
+##Examining distribution changes by decade##
 ###Survey data with depth, surface & bottom temperature, and Janet Nye's method of calculating lat/lon
 install.packages("matrixStats")
 library(matrixStats)
@@ -24,7 +25,7 @@ grouped_center_bio <- function(clean_survey, ...){
       .groups = "drop") 
 }
 
-weighted_data<-grouped_center_bio(clean_survey, est_year)
+weighted_data<-grouped_center_bio(clean_survey, est_year, season)
 weighted_data<-weighted_data%>%
   mutate(decade = 10*est_year %/% 10)
 
@@ -35,23 +36,54 @@ species<-species%>%
 species<-tolower(species$comname)
 
 dec_data<-weighted_data%>%
-  select(comname, est_year,avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
+  select(comname, est_year, season, avg_depth, avg_bot_temp, avg_sur_temp, avg_lat, avg_lon)%>%
   mutate(decade = 10*est_year %/% 10)%>%
-  group_by(comname)%>%
+  group_by(comname, season)%>%
   nest()%>%
   filter(comname %in% species)%>%
   mutate(num_obs = map(data, count))
 
+##aggregated averages
+test<-dec_data%>%
+  unnest(data)%>%
+  group_by(comname, est_year)%>%
+  nest()
+
+test<-test%>%
+  mutate( avg_depth       = as.numeric(map(data, possibly(mean_depth, NA))),
+          avg_bot_temp    = as.numeric(map(data, possibly(avg_bt, NA))),
+          avg_sur_temp    = as.numeric(map(data, possibly(avg_sst, NA))),
+          avg_lat         = as.numeric(map(data, possibly(mean_lat, NA))),
+          avg_lon         = as.numeric(map(data, possibly(mean_lon, NA))))
+
+test<-test%>%
+  group_by(comname)%>%
+  nest()
+
+test<-test%>%
+  filter(!comname == "tautog")
+
+#equal observations
+equal_obs_fun<- function(df){df$num_obs[1] == df$num_obs[2]}
+equal_obs<-dec_data%>%
+  filter(!comname == "tautog")%>%
+  select(comname, season, num_obs)%>%
+  group_by(comname)%>%
+  nest()%>%
+  mutate(equal_obs = map(data, equal_obs_fun),
+         equal_obs_years = unlist(equal_obs))%>%
+  select(comname, equal_obs_years)
+
 ###T-TEST####
-subset1<-dec_data%>%
+subset1<-test%>%
   unnest(data)%>%
   filter(est_year %in% c(1970:2009))%>%
   mutate(group = as.character("group_1"))
-subset2<-dec_data%>%
+subset2<-test%>%
   unnest(data)%>%
   filter(est_year %in% c(2000:2009))%>%
   mutate(group = as.character("group_2"))
-subset3<-dec_data%>%
+subset3<-test%>%
   unnest(data)%>%
   filter(est_year %in% c(2010:2019))%>%
   mutate(group = as.character("group_3"))
@@ -64,7 +96,6 @@ ttest_group_1<-t_test%>%
   filter(group %in% c("group_1", "group_3"))%>%
   group_by(comname)%>%
   nest()%>%
-  filter(!comname == "tautog")%>%
   mutate(num_obs      = map(data, possibly(count, NA)))%>%
   mutate(bart_sst     = map(data, possibly(bart_sst, NA)),
          bart_bt      = map(data, possibly(bart_bt, NA)),
@@ -108,7 +139,6 @@ ttest_group_2<-t_test%>%
   filter(group %in% c("group_2", "group_3"))%>%
   group_by(comname)%>%
   nest()%>%
-  filter(!comname == "tautog")%>%
   mutate(num_obs      = map(data, possibly(count, NA)))%>%
   mutate(bart_sst     = map(data, possibly(bart_sst, NA)),
          bart_bt      = map(data, possibly(bart_bt, NA)),
@@ -221,4 +251,3 @@ write.matrix(Welch_TTest_2, "Welch_t_test_2.csv", sep=",")
 write.csv(group_1_means, "Group_1_means.csv")
 write.csv(group_2_means, "Group_2_means.csv")
 write.csv(group_3_means, "Group_3_means.csv")
-
