@@ -222,3 +222,6 @@ write.csv(group_1_means, "Group_1_means.csv")
 write.csv(group_2_means, "Group_2_means.csv")
 write.csv(group_3_means, "Group_3_means.csv")
 
+head(weighted_data)
+print(weighted_data, n=100)
+print(clean_survey, n=100)

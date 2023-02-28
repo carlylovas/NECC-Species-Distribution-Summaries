@@ -40,7 +40,19 @@ dec_data<-weighted_data%>%
   mutate(decade = 10*est_year %/% 10)%>%
   group_by(comname, season)%>%
   nest()%>%
-  filter(comname %in% species)%>%
+  filter(comname %in% species)
+  
+dec_data<-dec_data%>% 
+  filter(!comname %in% c("atlantic croaker",
+                       "atlantic hagfish",
+                       "barndoor skate",
+                       "horseshoe crab",
+                       "northern kingfish",
+                       "spot",
+                       "striped bass",
+                       "tautog",
+                       "tilefish",
+                       "weakfish")) %>%
   mutate(num_obs = map(data, count))
 
 ##aggregated averages
@@ -60,18 +72,15 @@ test<-test%>%
   group_by(comname)%>%
   nest()
 
-test<-test%>%
-  filter(!comname == "tautog")
 
 #equal observations
 equal_obs_fun<- function(df){df$num_obs[1] == df$num_obs[2]}
 equal_obs<-dec_data%>%
-  filter(!comname == "tautog")%>%
   select(comname, season, num_obs)%>%
   group_by(comname)%>%
   nest()%>%
   mutate(equal_obs = map(data, equal_obs_fun),
-         equal_obs_years = unlist(equal_obs))%>%
+       equal_obs_years = unlist(equal_obs))%>%
   select(comname, equal_obs_years)
 
 ###T-TEST####
@@ -251,3 +260,66 @@ write.matrix(Welch_TTest_2, "Welch_t_test_2.csv", sep=",")
 write.csv(group_1_means, "Group_1_means.csv")
 write.csv(group_2_means, "Group_2_means.csv")
 write.csv(group_3_means, "Group_3_means.csv")
+
+##Kathy's revisions
+table<-Welch_TTest_1%>%
+  select(welch_lat_p, welch_lon_p, welch_sst_p, welch_bt_p, welch_depth_p)
+write.csv(table, "p_values.csv")
+
+#with species
+survey<-clean_survey%>%
+  left_join(., survey_tows)%>%
+  select(id, comname, est_year, season, avgdepth, surftemp, bottemp)%>%
+  filter(comname %in% species)%>%
+  distinct()%>% 
+  group_by(comname, season, est_year)%>%
+  nest()%>%
+  mutate(total_obs = map(data, count))
+
+survey_test<-survey%>%
+  unnest(data)%>%
+  summarise(st_na = sum(is.na(surftemp)),
+            bt_na = sum(is.na(bottemp)),
+            depth_na = sum(is.na(avgdepth)))
+
+species_survey<-survey_test%>%
+  left_join(survey %>%
+              select(total_obs)) %>%
+  unite(st_na, total_obs, col = "st_na", sep="/")%>%
+  left_join(survey %>%
+              select(total_obs)) %>%
+  unite(bt_na, total_obs, col = "bt_na", sep="/")%>%
+  left_join(survey %>%
+              select(total_obs)) %>%
+  unite(depth_na, total_obs, col = "depth_na", sep ="/")
+
+#without species
+survey_season<- clean_survey%>%
+  left_join(., survey_tows)%>%
+  select(id, comname, est_year, season, avgdepth, surftemp, bottemp)%>%
+  filter(comname %in% species)%>%
+  distinct()%>% 
+  group_by(est_year, season)%>%
+  nest()%>%
+  mutate(total_obs = map(data, count)) 
+
+survey_NAs<-survey_season%>%
+  unnest(data)%>%
+  summarise(st_na = sum(is.na(surftemp)),
+            bt_na = sum(is.na(bottemp)),
+            depth_na = sum(is.na(avgdepth)),
+            .groups = "keep")%>%
+  group_by(est_year, season)
+
+survey_NAs<-survey_NAs%>%
+  left_join(survey_season %>%
+              select(total_obs)) %>%
+  unite(st_na, total_obs, col = "st_na", sep="/")%>%
+  left_join(survey_season %>%
+              select(total_obs)) %>%
+  unite(bt_na, total_obs, col = "bt_na", sep="/")%>%
+  left_join(survey_season %>%
+              select(total_obs)) %>%
+  unite(depth_na, total_obs, col = "depth_na", sep ="/")
+
+write.csv(survey_NAs, "survey_NAs.csv")
