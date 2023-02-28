@@ -20,12 +20,6 @@ clean_survey<-gmri_survdat_prep(
 )
 str(clean_survey)
 
-clean_survey <- clean_survey %>% 
-  distinct(est_year, survey_area, stratum, tow, est_towdate, season, comname, catchsex, .keep_all = T) %>%
-  group_by(est_year, survey_area, stratum, tow, est_towdate, season, 
-           avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname) %>% 
-  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop")
-
 # get just the unique tow information -- we can join this back in later on
 survey_tows <- get_survdat_tows(clean_survey)
 summary(survey_tows)

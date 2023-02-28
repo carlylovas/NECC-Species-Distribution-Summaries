@@ -4,6 +4,13 @@
 install.packages("matrixStats")
 library(matrixStats)
 head(clean_survey)
+
+clean_survey <- clean_survey %>% 
+  distinct(est_year, survey_area, stratum, tow, est_towdate, season, comname, catchsex, .keep_all = T) %>%
+  group_by(est_year, survey_area, stratum, tow, est_towdate, season, 
+           avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname) %>% 
+  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop")
+
 grouped_center_bio <- function(clean_survey, ...){
   clean_survey %>% 
     group_by(comname, ...) %>% 
