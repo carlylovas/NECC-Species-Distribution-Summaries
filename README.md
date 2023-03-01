@@ -12,7 +12,7 @@ This folder contains the list of fishes included in the NECC study as well as th
 
 #### R
 
-This folder contains the prep code for cleaning the survey data `01_SurveyDataPrep.R`, code for the NECC species distribution analysis `02_SpeciesDistAnalysis`, code for plotting `03_Plotting_Mapping`. There are three additional scripts; code to explore decadal trends `04_Decadal_Variability`, @carlylovas' workspace `NECC.R`, and  `helper_funcs.R` which contains the code for three functions used in this analysis.
+This folder contains the prep code for cleaning the survey data `01_SurveyDataPrep.R`, code for the NECC species distribution analysis `02_SpeciesDistAnalysis`, code for plotting `03_Plotting_Mapping`. There are two additional scripts; , @carlylovas' workspace `NECC.R`, and  `helper_funcs.R` which contains the code for three functions used in this analysis.
 
 #### Temp_Results
 
