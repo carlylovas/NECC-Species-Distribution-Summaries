@@ -24,7 +24,8 @@ clean_survey  <- trawl_data %>%
   group_by(svspp, est_year, survey_area, stratum, tow, id, est_towdate, season, 
            avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname, abundance) %>% 
   filter(comname %in% species$comname) %>% 
-  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop")
+  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop") %>%
+  mutate(decade = 10*est_year %/% 10)
 
 # Sum total biomass by species in each year (L. Carlson)
 sum_biomass_year <- trawl_data %>%
@@ -69,7 +70,7 @@ weighted_survey_data %>%
   geom_density_ridges(aes(x = avg_lat, y = decade, fill = as.factor(decade)), alpha = .9) +
   guides(fill = guide_legend(title = "Decade")) +
   # scale_y_continuous(breaks = c("1970", "2010")) +
-  s# cale_y_reverse() +
+  # cale_y_reverse() +
   # ylim(c(2010, 1960)) +
   scale_fill_gmri() +
   theme_gmri(legend.position = "left") 
@@ -153,10 +154,16 @@ quantiles %>%
   geom_col(aes(x = avg_biomass , y = as.factor(`50%`)), fill = "#535353") +
   geom_col(aes(x = avg_biomass, y = as.factor(`75%`)), fill = "#EACA00") +
   geom_col(aes(x = avg_biomass, y = as.factor(`95%`)), fill = "#00608A") +
-   scale_y_discrete(breaks= c(36, 37, 38, 39, 40)) +
+  # ylim(c(30, 50)) +
+  scale_y_discrete(breaks= c(30, 35, 40, 45)) +
   facet_wrap(~decade, scales = "free_y") +
   theme_gmri() # I don't like this, refer back to Lindsey's code
-  
+
+
+# Quantiles by decade?
+## add to weighted lat shift? 
+decadal_quantiles <- grouped_quantiles(clean_survey, decade)
+
 
 # Latitudinal shift percentiles 
 lat_shift <- quantiles %>% 
@@ -175,17 +182,27 @@ lat_shift <- quantiles %>%
       theme_gmri()
     }))
 
-lat_shift$plot[[1]]
+lat_shift$plot[[27]]
 
-# 95th Percentile
-quantiles %>% 
-  filter(comname == "black sea bass") %>%
-  mutate(decade = 10*est_year %/% 10) %>% 
-  ggplot() +
-  geom_density_ridges(aes(x = `95%`, y = decade, fill = as.factor(decade)), alpha = .9) +
-  guides(fill = guide_legend(title = "Decade")) +
-  ylab("Decade") + xlab("95th Percentile") + ggtitle("Black sea bass") +
-  ylim(c(1970, NA)) +
-  scale_fill_gmri() +
-  coord_flip() +
-  theme_gmri()
+
+# difference in quantile slopes -> lean, retract, march, etc.
+# can we use the difference in magnitude and direction of these slopes to characterize types of movement?
+
+quantiles %>%
+  select(est_year, comname, `5%`, `95%`) %>%
+  mutate(`5%`  = zoo::rollapplyr(`5%`,  width = 5, FUN = mean, align = "center", partial = T),
+         `95%` = zoo::rollapplyr(`95%`, width = 5, FUN = mean, align = "center", partial = T)) %>%
+  group_by(comname) %>%
+  nest() %>%
+  mutate(anova = map(data, function(x){
+    mod_05 <- aov(`5%`  ~ est_year,  data = x)
+    mod_95 <- aov(`95%` ~ est_year, data = x)
+    anova  <- anova(mod_05, mod_95)
+    return(anova)
+  })) -> diff_lat_perc  # this doesn't work 
+
+# by season ?
+
+# difference in seasonal center of biomass ? 
+
+# 5th and 95 maps??
