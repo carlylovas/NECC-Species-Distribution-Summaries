@@ -1,0 +1,267 @@
+---
+title: "Latitude Percentiles"
+author: "cslovas"
+format: 
+  html:
+    toc: true
+    self-contained: true
+editor: visual
+---
+
+```{r}
+#| label: load libraries and dependencies
+#| echo: false
+#| message: false
+#| warning: false
+
+library(here)
+library(tidyverse)
+library(gmRi)
+# install.packages("matrixStats")
+library(matrixStats)
+# install.packages("ggridges")
+library(ggridges)
+library(gt)
+
+# species data
+species <- read_csv("/Users/clovas/Documents/necc_distributions/Data/speciesList_inNECC.csv") %>%
+  rename("comname" = "Species_comnam") %>%
+  mutate(comname   = tolower(comname)) %>%
+  select(comname)
+
+# Load NEFSC Bottom Trawl Survey data ####
+trawl_data <- gmri_survdat_prep(
+  survdat_source ="most recent",
+  box_location ="cloudstorage")
+
+clean_survey  <- trawl_data %>% 
+  distinct(svspp, est_year, survey_area, stratum, tow, id, est_towdate, season, comname, catchsex, .keep_all = T) %>%
+  group_by(svspp, est_year, survey_area, stratum, tow, id, est_towdate, season, 
+           avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname, abundance) %>% 
+  filter(comname %in% species$comname) %>% 
+  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop") %>%
+  mutate(decade = 10*est_year %/% 10)
+
+```
+
+```{r}
+#| label: quantiles
+#| echo: false
+#| message: false
+#| warning: false
+
+# Calculate and plot 5%, 10%, 25%, 75%, 90%, and 95% biomass-weighed percentiles
+grouped_quantiles <- function(clean_survey, ...){
+  clean_survey %>% 
+    group_by(comname, ...) %>% 
+    summarise(
+      # Un-weighted averages
+      total_biomass   = sum(biomass_kg),
+      avg_biomass     = mean(biomass_kg),
+      avg_lat         = mean(decdeg_beglat),
+      # Weight quantiles
+      `5%`  = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.05, na.rm = T),
+      `10%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.10, na.rm = T), 
+      `25%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.25, na.rm = T),
+      `50%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.50, na.rm = T),
+      `75%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.75, na.rm = T), 
+      `90%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.90, na.rm = T),
+      `95%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.95, na.rm = T),
+      .groups = "drop") %>%
+    mutate(across(where(is.numeric), round, 4))
+}
+
+quantiles <- grouped_quantiles(clean_survey, est_year)
+
+```
+
+```{r}
+#| label: movement matrix
+#| echo: false
+#| message: false
+#| warning: false
+
+quantiles %>% 
+  pivot_longer(cols = 6:12, names_to = "quantile", values_to = "lat") %>%
+  select(comname, est_year, quantile, lat) %>%
+  # filter(quantile %in% c("5%", "95%")) %>%
+  group_by(comname, quantile) %>%
+  mutate(rollmean = zoo::rollapplyr(lat, width = 5, FUN = mean, align = "center", partial = T)) %>%
+  group_by(comname, quantile) %>%
+  nest() %>%
+  mutate(mod  = map(data, function(x){lm(est_year ~ rollmean, data = x)}),
+         tidy = map(mod, broom::tidy)) -> mods
+
+slopes <- mods %>%
+  select(comname, quantile, tidy) %>%
+  unnest(tidy) %>%
+  filter(!term == "(Intercept)") %>%
+  rename("slope" = "estimate") %>%
+  select(comname, quantile, slope, p.value) %>%
+  mutate(signif   = ifelse(p.value <= 0.05, "true", "false"),
+         movement = ifelse(slope > 0, "+", "-"))
+
+slopes %>% 
+  filter(quantile  == "5%") %>%
+  mutate(trend = NA) -> fifth
+
+fifth$trend[fifth$movement == "+" & fifth$signif  == "true"]  = "northward"
+fifth$trend[fifth$movement == "+" & fifth$signif  == "false"] = "stable"
+fifth$trend[fifth$movement == "-" & fifth$signif == "false"] = "stable"
+fifth$trend[fifth$movement == "-" & fifth$signif == "true"]  = "southward"
+
+slopes %>% 
+  filter(quantile  == "95%") %>%
+  mutate(trend = NA) -> ninetyfifth
+
+ninetyfifth$trend[ninetyfifth$movement == "+" & ninetyfifth$signif  == "true"]  = "northward"
+ninetyfifth$trend[ninetyfifth$movement == "+" & ninetyfifth$signif  == "false"] = "stable"
+ninetyfifth$trend[ninetyfifth$movement == "-" & ninetyfifth$signif == "false"] = "stable"
+ninetyfifth$trend[ninetyfifth$movement == "-" & ninetyfifth$signif == "true"]  = "southward"
+
+
+trends <- fifth %>%
+  full_join(ninetyfifth) %>% 
+  select(comname, quantile, trend) %>% 
+  pivot_wider(names_from = quantile, values_from = trend) %>%
+  mutate(classification = NA)
+
+trends$classification[trends$`5%` == "northward" & trends$`95%` == "northward"] = "march - northward"
+trends$classification[trends$`5%` == "northward" & trends$`95%` == "southward"] = "retract"
+trends$classification[trends$`5%` == "southward" & trends$`95%` == "northward"] = "expand"
+trends$classification[trends$`5%` == "stable"    & trends$`95%` == "stable"]    = "stable"
+trends$classification[trends$`5%` == "stable"    & trends$`95%` == "northward"] = "expand - northward"
+trends$classification[trends$`5%` == "southward" & trends$`95%` == "southward"] = "march - southward"
+trends$classification[trends$`5%` == "southward" & trends$`95%` == "stable"]    = "expand - southward"
+trends$classification[trends$`5%` == "northward" & trends$`95%` == "stable"] = "lean - northward"
+trends$classification[trends$`5%` == "stable" & trends$`95%` == "southward"] = "lean - southward"
+
+
+trends %>% 
+  gt(groupname_col = NULL) %>%
+  cols_label(
+    comname = md("**Common name**"),
+    `5%`    = md("**5th percentile**"),
+    `95%`   = md("**95th percentile**"),
+    classification = md("**Movement classification**")
+  ) -> movement_table
+
+# gtsave(movement_table, here("movement_table.png"))
+
+# slopes %>% 
+#   select(comname, quantile, estimate) %>%
+#   filter(estimate > 0) %>%
+#   pivot_wider(names_from = quantile, values_from = estimate) %>%
+#   drop_na() %>% 
+#   mutate(movement = ifelse(`5%` > `95%`, "lean", "march")) -> northward
+# 
+# slopes %>%
+#   select(comname, quantile, estimate) %>%
+#   filter(!comname %in% northward$comname) %>%
+#   pivot_wider(names_from = quantile, values_from = estimate) %>%
+#   mutate(movement = ifelse(`5%` > 0 & `95%` < 0, "retract", "expand")) %>%
+#   full_join(northward) -> movement_trends
+# 
+# movement_trends$movement[0 > movement_trends$`5%` & 0 > movement_trends$`95%`] = "southward"
+
+```
+
+```{r}
+#| label: quantile plots
+#| echo: false
+#| message: false
+#| warning: false
+#| column: page
+#| fig-align: center
+#| fig-height: 9
+#| fig-width: 12
+
+lat_shift <- quantiles %>% 
+  pivot_longer(cols = 6:12, names_to = "quantile", values_to = "lat") %>%
+  select(comname, est_year, quantile, lat) %>%
+  group_by(comname, quantile) %>%
+  mutate(rollmean = zoo::rollapplyr(lat, width = 5, FUN = mean, align = "center", partial = T)) %>%
+  left_join(trends %>% select(comname, classification)) %>%
+  group_by(comname) %>% 
+  nest() %>% 
+  mutate(plot = map2(data, comname, function(x,y){
+    out <- ggplot(x) +
+      geom_line(aes(x = est_year, y = rollmean, color = quantile), linetype = 2) +
+      geom_smooth(aes(x = est_year, y = rollmean, color = quantile), method = "lm", se = F) +
+      ylab("Latitude") + xlab("Year") + ggtitle(str_to_sentence(comname), subtitle = x$classification) + 
+      scale_color_gmri() +
+      theme_gmri()
+    
+    # filename = paste(comname, "lat_shift_percentiles.png", sep="_")
+    # ggsave(out, filename = paste(here("Temp_Results", "Lat percentiles"), filename, sep="/"), width = 7, height =  5, units="in", bg = "white")
+    }))
+
+# lat_shift$plot[[27]]
+
+# all_lat_shift <- 
+gridExtra::marrangeGrob(lat_shift$plot, layout_matrix = matrix(1:2, nrow = 2, ncol = 1, byrow = TRUE), top = NULL)
+
+# ggsave(all_lat_shift, file=here("all_latitudinal_shifts.pdf"), width = 8.5, height = 11, units = "in")
+
+
+```
+
+```{r}
+#| label: weighted survey data
+#| echo: false
+#| message: false
+#| warning: false
+
+grouped_center_bio <- function(clean_survey, ...){
+  clean_survey %>% 
+    group_by(comname, ...) %>% 
+    summarise(
+      # Un-weighted averages
+      total_biomass   = sum(biomass_kg),
+      avg_biomass     = mean(biomass_kg),
+      biomass_sd      = sd(biomass_kg),
+      # All below are weighted by biomass
+      avg_depth       = weightedMean(avgdepth, w = biomass_kg, na.rm = T),
+      avg_bot_temp    = weightedMean(bottemp, w = biomass_kg, na.rm = T),
+      avg_sur_temp    = weightedMean(surftemp, w = biomass_kg, na.rm = T),
+      avg_lat         = weightedMean(decdeg_beglat, w = biomass_kg, na.rm = T),
+      avg_lon         = weightedMean(decdeg_beglon, w = biomass_kg, na.rm = T),
+      depth_sd        = weightedSd(avgdepth, w = biomass_kg, na.rm = T),
+      temp_sd         = weightedSd(bottemp, w = biomass_kg, na.rm = T),
+      lat_sd          = weightedSd(decdeg_beglat, w = biomass_kg, na.rm = T),
+      lon_sd          = weightedSd(decdeg_beglon, w = biomass_kg, na.rm = T),
+      .groups = "drop") 
+}
+
+weighted_survey_data <- grouped_center_bio(clean_survey, est_year) %>%
+  mutate(decade = 10*est_year %/% 10)
+
+```
+
+```{r}
+#| label: biomass plots
+#| echo: false
+#| message: false
+
+biomass_plots <- weighted_survey_data %>% 
+  group_by(comname) %>% 
+  filter(decade %in% c(1970,2010)) %>%
+  nest() %>% 
+  mutate(plot = map2(data, comname, function(x,y){
+    out <- ggplot(x) +
+      geom_density_ridges(aes(x = avg_lat, y = decade, fill = as.factor(decade)), alpha = .9) +
+      guides(fill = guide_legend(title = "Decade")) +
+      xlab("Biomass-weighted average latitude") + ggtitle(str_to_sentence(comname)) +
+      # ylim(c(1970, NA)) +
+      scale_fill_gmri() +
+      coord_flip() +
+      theme_gmri(axis.title.x = element_blank(),
+                 axis.text.x  = element_blank(),
+                 axis.ticks.x = element_blank())
+    # filename = paste(comname, "biomass_percentiles.png", sep="_")
+    # ggsave(out, filename = paste(here("Temp_Results", "Biomass percentiles"), filename, sep="/"), width = 7, height =  5, units="in", bg = "white")
+  }))
+
+# biomass_plots$plot[15]
+
+```
