@@ -3,6 +3,10 @@ library(tidyverse)
 library(gmRi)
 install.packages("matrixStats")
 library(matrixStats)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(ggrepel)
 
 # species data
 species <- read_csv(here("data", "speciesList_inNECC.csv")) %>%
@@ -19,7 +23,7 @@ GoM_survey  <- trawl_data %>%
   distinct(svspp, est_year, survey_area, stratum, tow, id, est_towdate, season, comname, catchsex, .keep_all = T) %>%
   group_by(svspp, est_year, survey_area, stratum, tow, id, est_towdate, season, 
            avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname, abundance) %>% 
-  filter(comname %in% species$comname & survey_area %in% c("GoM", "GB", "SNE")) %>% 
+  filter(comname %in% species$comname & survey_area %in% c("GoM", "GB", "SNE") & est_year >= 1980) %>% 
   summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop")
 
 ## change goosefish to monkfish
@@ -57,32 +61,62 @@ weighted_survey_data <- grouped_center_bio(GoM_survey, est_year)
 
 
 # Monkfish, Silver Hake, Atlantic Mackerel, Winter Flounder, Black Sea Bass, Butterfish, Scup, Yellowtail flounder
-
 plots <- weighted_survey_data %>%
   filter(comname %in% c("monkfish", "silver hake", "atlantic mackerel", "winter flounder", "black sea bass",
-                        "butterfish", "scup", "yellowtail flounder")) %>%
-  mutate(comname = stringr::str_to_sentence(comname))
+                        "butterfish", "smooth dogfish", "yellowtail flounder")) %>%
+  mutate(comname = stringr::str_to_title(comname)) %>%
+  group_by(comname) %>%
+  nest() %>%
+  mutate(plot = map2(data, comname, function(x,y){
+    out <- ggplot(x) +
+      geom_line(aes(x = est_year, y = avg_biomass), color = "#535353", alpha = 0.6) +
+      geom_smooth(aes(x = est_year, y = avg_biomass), color = "#00608A", linetype = 2, method = "lm", se = F) +
+      # facet_wrap(~comname, scales = "free_x", ncol = 2) +
+      ylim(c(0, 35)) +
+      xlab("Year") + ylab("Average Biomass (kg/sq. km)") + 
+      ggtitle(paste("Average Biomass of", comname, sep = " "), subtitle = "Gulf of Maine, Georges Bank, and Southern New England Survey Areas") +
+      theme_gmri(strip.background = element_rect(fill = "transparent"),
+                 strip.text = element_text(color = "black"),
+                 plot.subtitle = element_text(size = 9, face = "bold"),
+                 panel.border = element_rect(fill = NA, linetype = 1, linewidth = 1, color = "lightgray"),
+                 axis.title = element_text(size = 10, face = "bold"))
+    
+    filename = paste(comname, "biomass.png", sep = "_")
+    ggsave(file = paste0(here("Temp_Results/Lesson 4/"), filename), out, width = 9, height = 6.5, units = "in", bg = "white")
+  })) 
 
-cc_plot <- ggplot(plots) +
-  geom_line(aes(x = est_year, y = avg_biomass), color = "#535353", alpha = 0.6) +
-  geom_smooth(aes(x = est_year, y = avg_biomass), color = "#00608A", linetype = 2, method = "lm", se = F) +
-  facet_wrap(~comname, scales = "free_y", ncol = 2) +
-  xlab("Year") + ylab("Average Biomass (kg/sq. km)") + 
-  ggtitle("Average Biomass", subtitle = "Gulf of Maine, Georges Bank, and Southern New England Survey Areas") +
-  theme_gmri(strip.background = element_rect(fill = "transparent"),
-             strip.text = element_text(color = "black"),
-             plot.subtitle = element_text(size = 9, face = "bold"),
-             panel.border = element_rect(fill = NA, linetype = 1, linewidth = 1, color = "lightgray"),
-             axis.title = element_text(size = 10, face = "bold"))
-print(cc_plot)
-ggsave(file = paste0(here("Temp_Results", "Plots/"), "lesson_4.png"), width = 6.5, height = 9, units = "in", bg = "white")
+  
+plots$plot[[3]]
+# ggsave(file = paste0(here("Temp_Results", "Plots/"), "lesson_4.png"), width = 6.5, height = 9, units = "in", bg = "white")
 
+# Maps
+world <- ne_states(returnclass = "sf")
+cols <- c("#7D7C7C", "#22444B", "#0E6686", "#028ABD", "#02D2FF")
 
+maps <- plots %>% 
+  unnest(data) %>% 
+  select(comname, est_year, avg_lat, avg_lon) %>% 
+  mutate(decade = 10*est_year %/% 10) %>%
+  group_by(comname) %>%
+  nest() %>% 
+  mutate(map = map2(data, comname, function(x,y){
+    out <- ggplot(data = world)+
+      geom_sf()+ 
+      coord_sf(xlim=c(-74, -66), ylim=c(38, 46)) +
+      geom_point(data = x, aes(x = avg_lon, y = avg_lat, color = as.factor(decade)), size = 2) +
+      scale_color_manual(values = cols)+
+      xlab("Longitude") + ylab("Latitude") + ggtitle(comname) +
+      facet_wrap(~decade, nrow =1) + 
+      scale_y_continuous(breaks = c(38,46)) + scale_x_continuous(breaks = c(72,-70)) +
+      theme_gmri(legend.position = "none", 
+             legend.title = element_text(face = "bold", size = 10),
+             legend.text = element_text(size = 10), 
+             strip.background = element_rect(fill = "#00608A", color = "#00608A"), 
+             panel.border = element_rect(fill = NA, linetype = 1, linewidth = 1, color = "lightgray")) +
+      guides(color = guide_legend(title = "Decade", override.aes = list(size = 3)))
+    
+    filename = paste(comname, "map.png", sep = "_")
+    ggsave(file = paste0(here("Temp_Results/Lesson 4/"), filename), out, width = 9, height = 3.5, units = "in", bg = "white")
+  }))
 
-# Monkfish
-
-plots %>%
-  filter(comname == "Monkfish") -> monkfish
-
-summary(lm(est_year ~ avg_biomass, data = monkfish))
-
+maps$map[[4]]
