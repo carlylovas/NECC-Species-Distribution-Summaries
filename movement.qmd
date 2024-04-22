@@ -77,15 +77,15 @@ quantiles <- grouped_quantiles(clean_survey, est_year)
 
 # Directional movement
 
-## Comparing slopes
-
-Here we compare the slopes of the 5th, 50th and 95th percentiles of species distributions. Slopes are based on a 5-year rolling average of biomass-weighted latitudes. We characterize the species distribution trends by the direction and significance of the slope. We will examine magnitude in a later analysis.
-
 ```{r}
 #| label: directional movement
 #| echo: false
 #| message: false
 #| warning: false
+
+## Comparing slopes
+
+# Here we compare the slopes of the 5th, 50th and 95th percentiles of species distributions. Slopes are based on a 5-year rolling average of biomass-weighted latitudes. We characterize the species distribution trends by the direction and significance of the slope. We will examine magnitude in a later analysis.
 
 quantiles %>% 
   pivot_longer(cols = 6:12, names_to = "quantile", values_to = "lat") %>%
@@ -124,11 +124,11 @@ slopes %>%
   select(comname, quantile, trend) %>%
   pivot_wider(names_from = "quantile", values_from = "trend") -> trends
   
-trends  %>%
-  mutate(comname = str_to_sentence(comname)) %>%
-  gt(groupname_col = NULL) %>% 
-  tab_spanner(columns = c("5%", "50%", "95%"), label = md("**Percentiles**")) %>%
-  cols_label(comname = md("**Common name**"))
+# trends  %>%
+#   mutate(comname = str_to_sentence(comname)) %>%
+#   gt(groupname_col = NULL) %>% 
+#   tab_spanner(columns = c("5%", "50%", "95%"), label = md("**Percentiles**")) %>%
+#   cols_label(comname = md("**Common name**"))
 
 ```
 
@@ -197,12 +197,11 @@ trends %>%
 
 ```
 
-# Rate of movement
+## Rate of movement
 Now we want to explore the magnitude of species movement, coupled with their directional trends, to ultimately compare distribution changes of predator and prey species. We could compare rates of centroid movement, or edges-only. 
 
-### Centroid movement
 ```{r}
-#| label: centroid movement 
+#| label: quantile movement 
 #| echo: false
 #| warning: false
 #| message: false
@@ -210,44 +209,50 @@ Now we want to explore the magnitude of species movement, coupled with their dir
 #| fig-height: 13
 #| fig-width: 9
 
-# centroid movement first ?
-
 slopes %>% 
-  filter(quantile == "50%") %>% 
+  filter(quantile %in%  c("5%","50%","95%")) %>% 
   left_join(trends) %>%
   ungroup() %>%
-  select(comname, slope, `50%`) %>%
-  rename("trend" = "50%") %>% 
-  arrange(desc(slope)) %>% 
-  mutate(comname = str_to_sentence(comname),
-         trend = str_to_sentence(trend)) %>%
+  select(comname, slope, quantile, `5%`,`50%`, `95%`) %>%
+  rename("trend_5" = "5%",
+         "trend_50" = "50%", 
+         "trend_95" = "95%") %>% 
+  pivot_wider(names_from = "quantile", values_from = "slope") %>%
+  mutate(comname = str_to_sentence(comname)) %>%
   gt(groupname_col = NULL) %>% 
-    cols_label(
+  tab_spanner(columns = c(`5%`, trend_5), label = md("**5th Percentile**")) %>%
+  tab_spanner(columns = c(`50%`, trend_50), label = md("**50th Percentile**")) %>%
+  tab_spanner(columns = c(`95%`, trend_95), label = md("**95th Percentile**")) %>%
+  cols_label(
       comname = md("**Common name**"),
-      slope = md("**Slope**"),
-      trend = md("**Trend**")
+      `5%` = md("**Slope**"),
+      `50%` = md("**Slope**"),
+      `95%` = md("**Slope**"),
+      trend_5 = md("**Trend**"),
+      trend_50 = md("**Trend**"),
+      trend_95 = md("**Trend**")
     ) %>%
-  fmt_number(columns = slope, decimals = 2) 
+  fmt_number(columns = everything(), decimals = 2) %>%
+  tab_style(
+    style = cell_text(style = "italic"),
+    locations = cells_body(columns = c(trend_5, trend_50, trend_95)))
 
-mods %>% 
-  filter(quantile == "50%") %>% 
-  select(comname, quantile, data) %>% 
-  unnest(data) %>% 
-  left_join(trends %>% select(comname, `50%`) %>% rename("trend" = "50%")) %>%
-  ggplot() +
-  geom_line(aes(x =est_year, y = rollmean, color = comname)) +
-  facet_wrap(~trend,ncol = 1) +
-  xlab("Year") + ylab("Latitude") + 
-  scale_color_gmri() +
-  theme_gmri(legend.position = "bottom",
-             strip.background = element_rect(fill = "white"),
-             strip.text = element_text(color = "black")) 
+# mods %>%
+#   filter(quantile == "50%") %>%
+#   select(comname, quantile, data) %>%
+#   unnest(data) %>%
+#   left_join(trends %>% select(comname, `50%`) %>% rename("trend" = "50%")) %>%
+#   ggplot() +
+#   geom_line(aes(x =est_year, y = rollmean, color = comname)) +
+#   facet_wrap(~trend,ncol = 1) +
+#   xlab("Year") + ylab("Latitude") +
+#   scale_color_gmri() +
+#   theme_gmri(legend.position = "bottom",
+#              strip.background = element_rect(fill = "white"),
+#              strip.text = element_text(color = "black"))
 
 
 ```
-
-### Edge movement 
-Here we examine the rates of change for the southern and northern edges (5th and 95th percentiles). 
 
 ```{r}
 #| label: edge movement 
@@ -255,30 +260,32 @@ Here we examine the rates of change for the southern and northern edges (5th and
 #| warning: false
 #| message: false
 
+### Edge movement 
+# Here we examine the rates of change for the southern and northern edges (5th and 95th percentiles). 
 
-slopes %>% 
-  filter(quantile %in% c("5%", "95%")) %>% 
-  left_join(trends) %>%
-  ungroup() %>%
-  select(comname, slope, quantile, `5%`, `95%`) %>%
-  rename("trend_5" = "5%",
-         "trend_95" = "95%") %>% 
-  pivot_wider(names_from = "quantile", values_from = "slope") %>%
-  mutate(comname = str_to_sentence(comname)) %>%
-  gt(groupname_col = NULL) %>% 
-  tab_spanner(columns = c(`5%`, trend_5), label = md("**5th Percentile**")) %>%
-  tab_spanner(columns = c(`95%`, trend_95), label = md("**95th Percentile**")) %>%
-  cols_label(
-      comname = md("**Common name**"),
-      `5%` = md("**Slope**"),
-      `95%` = md("**Slope**"),
-      trend_5 = md("**Trend**"),
-      trend_95 = md("**Trend**")
-    ) %>%
-  fmt_number(columns = everything(), decimals = 2) %>%
-  tab_style(
-    style = cell_text(style = "italic"),
-    locations = cells_body(columns = c(trend_5, trend_95)))
+# slopes %>% 
+#   filter(quantile %in% c("5%", "95%")) %>% 
+#   left_join(trends) %>%
+#   ungroup() %>%
+#   select(comname, slope, quantile, `5%`, `95%`) %>%
+#   rename("trend_5" = "5%",
+#          "trend_95" = "95%") %>% 
+#   pivot_wider(names_from = "quantile", values_from = "slope") %>%
+#   mutate(comname = str_to_sentence(comname)) %>%
+#   gt(groupname_col = NULL) %>% 
+#   tab_spanner(columns = c(`5%`, trend_5), label = md("**5th Percentile**")) %>%
+#   tab_spanner(columns = c(`95%`, trend_95), label = md("**95th Percentile**")) %>%
+#   cols_label(
+#       comname = md("**Common name**"),
+#       `5%` = md("**Slope**"),
+#       `95%` = md("**Slope**"),
+#       trend_5 = md("**Trend**"),
+#       trend_95 = md("**Trend**")
+#     ) %>%
+#   fmt_number(columns = everything(), decimals = 2) %>%
+#   tab_style(
+#     style = cell_text(style = "italic"),
+#     locations = cells_body(columns = c(trend_5, trend_95)))
 
 
 ```
