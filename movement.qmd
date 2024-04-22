@@ -8,6 +8,10 @@ format:
 editor: visual
 ---
 
+Drawing inspiration from Lenoir & Svenning, we aim to characterize general distribution change patterns in species from the NEFSC Bottom Trawl Survey.
+
+![](2014_LenoirandSvenning_RangeShiftReview.jpg){fig-align="center"}
+
 ```{r}
 #| label: load libraries and dependencies
 #| echo: false
@@ -136,7 +140,7 @@ slopes %>%
 
 Distribution changes are characterized by the movement trends of the 5th, 50th, and 95th percentiles (representing distibution edges).
 
--   *Stable*: All edges and centroid are stable. 
+-   *Stable*: All edges and centroid are stable.
 
 -   *March*: All edges and centroid are showing movement in the same direction (northward, southward)
 
@@ -144,9 +148,9 @@ Distribution changes are characterized by the movement trends of the 5th, 50th, 
 
 -   *Contract*: The centroid is stable and edges are moving towards each other.
 
--   *Lean*: The centroid and one edge are moving in the same direction. 
+-   *Lean*: The centroid and one edge are moving in the same direction.
 
--   *Retract*: The centroid and one edge are stable while one edge moves towards the centroid. 
+-   *Retract*: The centroid and one edge are stable while one edge moves towards the centroid.
 
 ```{r}
 #| label: characterizing movement
@@ -198,7 +202,8 @@ trends %>%
 ```
 
 ## Rate of movement
-Now we want to explore the magnitude of species movement, coupled with their directional trends, to ultimately compare distribution changes of predator and prey species. We could compare rates of centroid movement, or edges-only. 
+
+Now we want to explore the magnitude of species movement, coupled with their directional trends, to ultimately compare distribution changes of predator and prey species. We could compare rates of centroid movement, or edges-only.
 
 ```{r}
 #| label: quantile movement 
@@ -297,3 +302,9 @@ slopes %>%
 
 
 ```
+
+### Examples of movement categories 
+
+![](Temp_Results/Lat percentiles/acadian redfish_lat_shift_percentiles.png)
+
+![](Temp_Results/Lat percentiles/black sea bass_lat_shift_percentiles.png)
