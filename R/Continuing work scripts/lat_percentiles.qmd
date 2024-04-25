@@ -84,7 +84,7 @@ quantiles <- grouped_quantiles(clean_survey, est_year)
 quantiles %>% 
   pivot_longer(cols = 6:12, names_to = "quantile", values_to = "lat") %>%
   select(comname, est_year, quantile, lat) %>%
-  # filter(quantile %in% c("5%", "95%")) %>%
+  filter(quantile %in% c("5%", "50%", "95%")) %>%
   group_by(comname, quantile) %>%
   mutate(rollmean = zoo::rollapplyr(lat, width = 5, FUN = mean, align = "center", partial = T)) %>%
   group_by(comname, quantile) %>%
