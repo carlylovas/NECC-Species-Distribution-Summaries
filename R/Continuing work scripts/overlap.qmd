@@ -8,10 +8,26 @@ editor: visual
 ---
 
 ```{r}
+#| label: load libraries and dependencies
+#| echo: false
+#| message: false
+#| warning: false
+
+library(here)
+library(tidyverse)
+library(gmRi)
+library(matrixStats)
+library(sf)
+library(lwgeom)
+```
+
+```{r}
 #| label: overlap functions
 #| echo: false
 
-# credit to G. Carroll et al 2019
+#### overlap functions to accompany Carroll et al. (2019) 'A review of methods for quantifying predator-prey overlap,' Global Ecology and Biogeography 
+## please see accompanying paper for detailed descriptions of metrics and their ecological interpretations
+
 
 ## area overlap
 ## for binary data
@@ -116,8 +132,9 @@ AB_overlapfn <- function(prey, pred) {
 # species data
 species <- read_csv("/Users/clovas/Documents/necc_distributions/Data/speciesList_inNECC.csv") %>%
   rename("comname" = "Species_comnam") %>%
-  mutate(comname   = tolower(comname)) %>%
-  select(comname)
+  mutate(comname   = tolower(comname))
+  # filter(NECC == "Y") %>%
+  # select(comname)
 
 # Load NEFSC Bottom Trawl Survey data ####
 trawl_data <- gmri_survdat_prep(
@@ -131,6 +148,250 @@ clean_survey  <- trawl_data %>%
   filter(comname %in% species$comname) %>% 
   summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop") %>%
   mutate(decade = 10*est_year %/% 10)
+
+prey <- c("alewife", "atlantic herring", "northern sand lance", "longfin squid", "silver hake", "shortfin squid")
+
+prey <- species %>% 
+  filter(comname %in% prey) %>% 
+  select(comname) %>% 
+  mutate(guild = "prey")
+
+pred <- species %>% 
+  filter(NECC == "Y") %>% 
+  filter(!comname %in% prey$comname) %>% 
+  select(comname) %>%
+  mutate(guild = "pred")
+
+species_data <- pred %>% 
+  full_join(prey) %>% 
+  arrange(comname)
+
+```
+
+```{r}
+#| label: spatial extent
+#| echo: false
+#| message: false
+
+# grouped_center_bio <- function(clean_survey, ...){
+#   clean_survey %>% 
+#     group_by(comname, ...) %>% 
+#     summarise(
+#       # Un-weighted averages
+#       total_biomass   = sum(biomass_kg),
+#       avg_biomass     = mean(biomass_kg),
+#       biomass_sd      = sd(biomass_kg),
+#       # All below are weighted by biomass
+#       avg_depth       = weightedMean(avgdepth, w = biomass_kg, na.rm = T),
+#       avg_bot_temp    = weightedMean(bottemp, w = biomass_kg, na.rm = T),
+#       avg_sur_temp    = weightedMean(surftemp, w = biomass_kg, na.rm = T),
+#       avg_lat         = weightedMean(decdeg_beglat, w = biomass_kg, na.rm = T),
+#       avg_lon         = weightedMean(decdeg_beglon, w = biomass_kg, na.rm = T),
+#       depth_sd        = weightedSd(avgdepth, w = biomass_kg, na.rm = T),
+#       temp_sd         = weightedSd(bottemp, w = biomass_kg, na.rm = T),
+#       lat_sd          = weightedSd(decdeg_beglat, w = biomass_kg, na.rm = T),
+#       lon_sd          = weightedSd(decdeg_beglon, w = biomass_kg, na.rm = T),
+#       .groups = "drop") 
+# }
+# 
+# weighted_bio <- grouped_center_bio(clean_survey, est_year)
+
+# Turn off spherical geometry
+# sf::sf_use_s2(FALSE)
+# 
+# weighted_bio %>% 
+#   filter(comname %in% species_data$comname) %>% 
+#   select(est_year, comname, avg_lat, avg_lon) %>% 
+#   # mutate(decade = 10*est_year %/% 10) %>%
+#   st_as_sf(coords = c("avg_lon","avg_lat"), crs = 4326)  %>%
+#   group_by(comname) %>%
+#   summarise(geometry = st_combine(geometry)) %>%
+#   st_cast("POLYGON") -> spatial_data
+  # mutate(area = st_buffer(geometry)) 
+  # mutate(area = st_area(geometry),
+         # area = str_remove(area, "[m^2]"), # remember area values are in m^2, convert to km^2 later
+         # area = parse_number(area)) -> spatial_data
+
+# species_data %>% 
+#   full_join(spatial_data) -> species_data
+
+# plot(spatial_data$geometry[[1]])
+# plot(spatial_data$area[[1]])
+
+```
+
+```{r}
+#| label: mapping overlap functions
+#| echo: false
+
+# csl: I'm thinking the "area" argument of the G.Carroll functions will require st_intersection() between predator and prey, not the area occupied by a particular species
+
+# species_data %>% 
+#   filter(guild == "prey") %>%
+#   select(comname, geometry) %>% 
+#   mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+#   rename("prey" = "comname",
+#          "prey_area" = "geometry") %>%
+#   nest() -> prey
+# 
+# species_data %>% 
+#   filter(guild == "pred") %>% 
+#   select(comname, geometry) %>%
+#   mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+#   cbind(prey) %>% 
+#   unnest(data) %>%
+#   rename("pred" = "comname",
+#          "pred_area" = "geometry") %>%
+#   mutate(pred_area = st_make_valid(pred_area),
+#          prey_area = st_make_valid(prey_area)) %>%
+#   relocate(prey, .after = pred) -> overlap_area
+# 
+# overlap_area %>% 
+#   group_by(pred, prey, pred_area, prey_area) %>%
+#   # reframe(area = st_overlaps(pred_area, prey_area)) -> overlap_area
+#   # reframe(area = st_intersection(pred_area, prey_area)) -> overlap_area
+#   reframe(overlap = st_intersection(pred_area, prey_area),
+#           area    = st_area(overlap)) %>%
+#   mutate(area = str_remove(area, "[m^2]"), # remember area values are in m^2, convert to km^2 later
+#          area = parse_number(area)) -> overlap_area
+# 
+# overlap_area %>% 
+#   select(pred, prey, overlap) %>% 
+#   mutate(overlap = st_transform(overlap, crs = 4326)) -> test
+
+# plot(test$area[[6]]) maybe................
+
+```
+
+```{r}
+#| label: trying over
+#| echo: false
+
+# Turn off spherical geometry
+sf::sf_use_s2(FALSE)
+
+clean_survey %>% 
+  filter(comname %in% species_data$comname) %>% 
+  select(est_year, comname, decdeg_beglat, decdeg_beglon) %>%
+  rename("avg_lon" = "decdeg_beglon",
+         "avg_lat" = "decdeg_beglat") %>%
+  st_as_sf(coords = c("avg_lon","avg_lat"), crs = 4326) %>%
+  group_by(comname) %>% 
+  summarise(geometry = st_combine(geometry)) %>%
+  # st_cast("POLYGON") %>% 
+  mutate(area = st_area(geometry)) %>% 
+  mutate(area = str_remove(area, "[m^2]"), # remember area values are in m^2, convert to km^2 later
+         area = parse_number(area)) -> spatial_data
+
+species_data %>% 
+  full_join(spatial_data) -> species_data
+
+species_data %>% 
+  filter(guild == "prey") %>%
+  select(comname, geometry) %>% 
+  mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+  rename("prey" = "comname",
+         "prey_area" = "geometry") %>%
+  nest() -> prey
+
+species_data %>% 
+  filter(guild == "pred") %>% 
+  select(comname, geometry) %>%
+  mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+  cbind(prey) %>% 
+  unnest(data) %>%
+  rename("pred" = "comname",
+         "pred_area" = "geometry") %>%
+  mutate(pred_area = st_make_valid(pred_area),
+         prey_area = st_make_valid(prey_area)) %>%
+  relocate(prey, .after = pred) -> overlap_area
+
+overlap_area %>% 
+  mutate(pred_area = st_make_valid(pred_area),
+         prey_area = st_make_valid(prey_area)) %>%
+  group_by(pred, prey, pred_area, prey_area) %>%
+  summarise(overlap = st_intersection(pred_area, prey_area)) -> overlap_area
+
+overlap_area %>%
+  filter(pred == "atlantic cod" & prey == "atlantic herring") %>%
+  ggplot() +
+  geom_sf(aes(geometry = prey_area), color = "lightblue") +
+  geom_sf(aes(geometry = pred_area), color = "red") +
+  geom_sf(aes(geometry = overlap), color = "purple", alpha = 0.5)
+  # hmmm 
+
+overlap_area %>% 
+  mutate(overlap = st_cast(overlap, "POLYGON")) %>%
+  group_by(pred, prey) %>% 
+  reframe(overlap_area = st_area(overlap)) %>% 
+  mutate(overlap_area = str_remove(overlap_area, "[m^2]"),
+         overlap_area = parse_number(overlap_area),
+         km_area = (overlap_area*.0000001)) # maybe do this by decade? change in overlap (+/-/0)
+
+```
+
+```{r}
+#| label: same as above but by decade (yearly values too small)
+#| echo: false
+
+clean_survey %>% 
+  filter(comname %in% species_data$comname) %>% 
+  mutate(decade = 10*est_year %/% 10) %>%
+  select(decade, comname, decdeg_beglat, decdeg_beglon) %>%
+  rename("avg_lon" = "decdeg_beglon",
+         "avg_lat" = "decdeg_beglat") %>%
+  st_as_sf(coords = c("avg_lon","avg_lat"), crs = 4326) %>%
+  group_by(comname, decade) %>% 
+  summarise(geometry = st_combine(geometry)) -> spatial_data
+
+species_data %>% 
+  full_join(spatial_data) -> species_data
+
+species_data %>% 
+  filter(guild == "prey") %>%
+  select(decade, comname, geometry) %>% 
+  mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+  rename("prey" = "comname",
+         "prey_area" = "geometry") %>%
+  group_by(decade) %>% 
+  nest() -> prey
+
+species_data %>% 
+  filter(guild == "pred") %>% 
+  select(decade, comname, geometry) %>%
+  mutate(geometry = st_transform(geometry, "+proj=eqc")) %>% 
+  left_join(prey) %>% 
+  unnest(data) %>%
+  rename("pred" = "comname",
+         "pred_area" = "geometry") %>%
+  mutate(pred_area = st_make_valid(pred_area),
+         prey_area = st_make_valid(prey_area)) %>%
+  relocate(prey, .after = pred) -> overlap_area
+
+overlap_area %>% 
+  mutate(pred_area = st_make_valid(pred_area),
+         prey_area = st_make_valid(prey_area)) %>%
+  group_by(decade, pred, prey) %>%
+  mutate(overlap = st_intersection(pred_area, prey_area)) -> overlap_area
+
+overlap_area %>%
+  filter(pred == "atlantic cod" & prey == "atlantic herring") %>%
+  ggplot() +
+  geom_sf(aes(geometry = prey_area), color = "lightblue") +
+  geom_sf(aes(geometry = pred_area), color = "red") +
+  geom_sf(aes(geometry = overlap), color = "purple", alpha = 0.5) +
+  facet_wrap(~decade)
+
+overlap_area %>% 
+  filter(!(pred == "smooth dogfish" & prey == "atlantic herring") & !(pred == "bluefish" & prey == "northern sand lance")) %>%
+  mutate(overlap = st_cast(overlap, "POLYGON", do_split = FALSE)) %>% # dogfish/herring and bluefish/sand lance causing issues
+  group_by(decade, pred, prey) %>% 
+  reframe(overlap_area = st_area(overlap)) %>% 
+  mutate(overlap_area = str_remove(overlap_area, "[m^2]"),
+         overlap_area = parse_number(overlap_area),
+         km_area = (overlap_area*.0000001)) -> pred_prey_overlap
+
+
 
 ```
 

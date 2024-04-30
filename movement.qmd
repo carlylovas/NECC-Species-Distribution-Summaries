@@ -31,6 +31,7 @@ library(gt)
 species <- read_csv("/Users/clovas/Documents/necc_distributions/Data/speciesList_inNECC.csv") %>%
   rename("comname" = "Species_comnam") %>%
   mutate(comname   = tolower(comname)) %>%
+  filter(NECC == "Y") %>%
   select(comname)
 
 # Load NEFSC Bottom Trawl Survey data ####
@@ -303,8 +304,26 @@ slopes %>%
 
 ```
 
-### Examples of movement categories 
+### Examples of movement categories
 
-![](Temp_Results/Lat percentiles/acadian redfish_lat_shift_percentiles.png)
+![](Temp_Results/Lat%20percentiles/acadian%20redfish_lat_shift_percentiles.png)
 
-![](Temp_Results/Lat percentiles/black sea bass_lat_shift_percentiles.png)
+![](Temp_Results/Lat%20percentiles/black%20sea%20bass_lat_shift_percentiles.png)
+
+```{r}
+#| label: movement matrix
+#| echo: false
+#| message: false
+# 
+# pred <- c("march", "expand", "contract", "retract", "lean", "stable")
+# prey <- c("march", "expand", "contract", "retract", "lean", "stable")
+# 
+# pred_prey <- cbind(pred, prey)
+# 
+# pred_prey <- as_tibble(pred_prey)
+# 
+# pred_prey %>% 
+#   pivot_wider(names_from = pred, values_from = "NA")
+
+
+```
