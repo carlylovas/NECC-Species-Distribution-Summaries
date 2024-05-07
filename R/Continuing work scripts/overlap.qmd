@@ -21,7 +21,7 @@ library(sf)
 library(lwgeom)
 ```
 ## Movement matrix
-Based on our [movement classifications](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html) we've described a general summary of expected overlap patterns between predator and prey. Increasing (+), decreasing (-), or equal/continued ovelap is contingent on the starting area of overlap. Where predators and prey are present in the beginning of this analysis ultimately decides how much, or how little, the two species share the same space over time. When initially designing this matrix, we assumed similar rates of change and equal starting points but quickly realized that these starting conditions would only ever yield decreasing or continuing areas of overlap. By focusing multiple starting conditions, we can extract general patterns of change. Some movement classifications present a directional challenge in which one species may be moving in a direction inconsistent with its counterpart. We see this issue most prevalent in the marching and contracting movement types. The aim of this matrix is to pick out the different methods of overlap that ultimately yield the same/similar results. For an example, a species that is expanding will either increase or continue its area of overlap, regardless of what is counterpart is doing (excluding retracting, in which it appears the overlap will decrease.)
+Based on our [movement classifications](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html) we've described a general summary of expected overlap patterns between predator and prey. Increasing (+), decreasing (-), or equal/continued ovelap is contingent on the starting area of overlap. Where predators and prey are present in the beginning of this analysis ultimately decides how much, or how little, the two species share the same space over time. When initially designing this matrix, we assumed similar rates of change and equal starting points but quickly realized that these starting conditions would only ever yield decreasing or continuing areas of overlap. By focusing multiple starting conditions, we can extract general patterns of change. Some movement classifications present a directional challenge in which one species may be moving in a direction inconsistent with its counterpart. We see this issue most prevalent in the *march* and *lean* movement types. The aim of this matrix is to pick out the different methods of overlap that ultimately yield the same/similar results. For an example, a species that is expanding will either increase or continue its general area of overlap, regardless of what is counterpart is doing (excluding retracting, in which it appears the overlap will decrease.)
 
 ```{r}
 #| label: movement matrix
@@ -348,7 +348,7 @@ species_list %>%
 ```
 
 ### Example
-Here we use the unweighted survey data to create point geometries of *Atlantic herring* (light blue) and *Atlantic cod* (red) occurrence. We then create another point geometry of the intersections of these two species, shown in purple. This data spans 1980-2020. We later try this similar geospatial analysis at the annual and decadal scales. We are also able to calculate the area of square kilometers for each of these three geometries. 
+Here we use the unweighted survey data to create point geometries of *Atlantic herring* (light blue) and *Atlantic cod* (red) occurrence from 1980-2020. We then create another point geometry of the intersections of these two species, shown in purple. We later try this similar geospatial analysis at the annual and decadal scales. We are also able to calculate the area of square kilometers for each of these three geometries. 
 
 ```{r}
 #| label: trying over
@@ -422,7 +422,7 @@ overlap_area %>%
 
 ```
 
-At the decadal time scale (1980-2020), we've transformed the intersection calculated via an equirectangular projection to WGS84 - EPSF:4326. This converts the values into familiar latitude and longitude, while still assuming non-spherical geometry. Plotted below are the intersections of prey *Atlantic herring* and predator *Atlantic cod*. My aim is to use the area calculated here, the total intersection, to run Carroll et. al's various overlap metrics.
+At the decadal time scale (1980-2020), we've transformed the intersection calculated via an equirectangular projection to WGS84/EPSF:4326. This converts the values into familiar latitude and longitude, while still assuming non-spherical geometry. Plotted below are the intersections of prey *Atlantic herring* and predator *Atlantic cod*. My aim is to use the area calculated here, the total intersection, to run Carroll et. al's various overlap metrics.
 
 ```{r}
 #| label: same as above but by decade (yearly values too small)
