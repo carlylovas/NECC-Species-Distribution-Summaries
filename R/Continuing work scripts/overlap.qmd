@@ -20,6 +20,78 @@ library(matrixStats)
 library(sf)
 library(lwgeom)
 ```
+## Movement matrix
+Based on our [movement classifications](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html) we've described a general summary of expected overlap patterns between predator and prey. Increasing (+), decreasing (-), or equal/continued ovelap is contingent on the starting area of overlap. Where predators and prey are present in the beginning of this analysis ultimately decides how much, or how little, the two species share the same space over time. When initially designing this matrix, we assumed similar rates of change and equal starting points but quickly realized that these starting conditions would only ever yield decreasing or continuing areas of overlap. By focusing multiple starting conditions, we can extract general patterns of change. Some movement classifications present a directional challenge in which one species may be moving in a direction inconsistent with its counterpart. We see this issue most prevalent in the marching and contracting movement types. The aim of this matrix is to pick out the different methods of overlap that ultimately yield the same/similar results. For an example, a species that is expanding will either increase or continue its area of overlap, regardless of what is counterpart is doing (excluding retracting, in which it appears the overlap will decrease.)
+
+```{r}
+#| label: movement matrix
+#| echo: false
+#| message: false
+
+library(gt)
+movement_matrix <- read_csv(here("Data", "movement_matrix.csv"))
+cats <- names(movement_matrix)
+
+gt(movement_matrix, groupname_col = NULL, rowname_col = "...1") %>%
+  tab_stubhead(label = "Pred/Prey") %>%
+  tab_style(
+    style = cell_text(weight  = "bold"),
+    locations = cells_stubhead()
+  ) %>%
+  tab_style(
+    style = cell_text(align  = "center"),
+    locations = cells_body(everything())
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = '#E9E9E9')),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_detect(!!sym(x),"= / 0")
+                     )})) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = '#EACA00', alpha = 0.8)),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_detect(!!sym(x), pattern = "- / =")
+                     )})) %>%
+    tab_style(
+    style = list(
+      cell_fill(color = '#EA4F12', alpha = 0.8)),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_ends(!!sym(x), coll("+ / -"))
+                     )})) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = '#00608A', alpha = 0.8)),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_detect(!!sym(x), coll("+ / ="))
+                     )}))%>%
+  tab_style(
+    style = list(
+      cell_fill(color = '#ABB400', alpha = 0.8)),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_starts(!!sym(x), coll("- / 0"))
+                     )})) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = '#00736D', alpha = 0.8)),
+     locations = map( cats ,
+                     \(x){cells_body(
+                       columns = x,
+                       rows = str_starts(!!sym(x), coll("+ / - / 0"))
+                     )}))
+
+```
 
 ```{r}
 #| label: overlap functions
@@ -124,10 +196,17 @@ AB_overlapfn <- function(prey, pred) {
 
 ```
 
+## Carroll et. all overlap metrics
+
+We intend to use the functions provided in the supplemental information from G. Carroll's 2019 paper, "A review of methods for quantifying predator-prey overlap." The majority of these functions require three arguments; `pred`, `prey`, and `area`. At this time, it is unclear what `area` is exactly, but I've been working to quantify the total area of occupancy of 29 predators and 5 prey species. What remains unclear is whether these points should be weighted by the biomass or if presence at a give latitude/longitude is sufficient for capturing the range of the species. It is possible to calculate this area of occurence on annual and decadal time scales, although some interactions are lost due to the inability to polygonize less than three points. 
+
+An additional hurdle is the recent [update](https://r-spatial.org/r/2020/06/17/s2.html) to the commonly used geospatial packages `sf` and `terra`. Both now recognize that the earth is not a flat surface and therefore will not execute certain functions of the `sf` package. It is possible to disable this spherical geometry in order to force these functions, but you run the risks of inaccuracy/inconsistency by repeatedly transforming the coordinate reference systems and forcing an equirectangular projection. While is update is relevant and reflective of reality, it has been an obstacle in this simple occurrence analysis. 
+
 ```{r}
 #| label: species data
 #| echo: false
 #| message: false
+#| warning: false
 
 # species data
 species <- read_csv("/Users/clovas/Documents/necc_distributions/Data/speciesList_inNECC.csv") %>%
@@ -162,10 +241,15 @@ pred <- species %>%
   select(comname) %>%
   mutate(guild = "pred")
 
-species_data <- pred %>% 
+species_list <- pred %>% 
   full_join(prey) %>% 
   arrange(comname)
 
+species_list %>%
+  pivot_wider(names_from = guild, values_from = comname) %>% 
+  gt() %>%
+  cols_label(pred = md("**Predator**"),
+             prey = md("**Prey**"))
 ```
 
 ```{r}
@@ -263,15 +347,23 @@ species_data <- pred %>%
 
 ```
 
+### Example
+Here we use the unweighted survey data to create point geometries of *Atlantic herring* (light blue) and *Atlantic cod* (red) occurrence. We then create another point geometry of the intersections of these two species, shown in purple. This data spans 1980-2020. We later try this similar geospatial analysis at the annual and decadal scales. We are also able to calculate the area of square kilometers for each of these three geometries. 
+
 ```{r}
 #| label: trying over
 #| echo: false
+#| message: false
+#| warning: false
+#| fig-align: center
+#| fig-width: 8
+#| fig-height: 8
 
 # Turn off spherical geometry
 sf::sf_use_s2(FALSE)
 
 clean_survey %>% 
-  filter(comname %in% species_data$comname) %>% 
+  filter(comname %in% species_list$comname & est_year >= 1980) %>% 
   select(est_year, comname, decdeg_beglat, decdeg_beglon) %>%
   rename("avg_lon" = "decdeg_beglon",
          "avg_lat" = "decdeg_beglat") %>%
@@ -283,7 +375,7 @@ clean_survey %>%
   mutate(area = str_remove(area, "[m^2]"), # remember area values are in m^2, convert to km^2 later
          area = parse_number(area)) -> spatial_data
 
-species_data %>% 
+species_list %>% 
   full_join(spatial_data) -> species_data
 
 species_data %>% 
@@ -320,22 +412,29 @@ overlap_area %>%
   geom_sf(aes(geometry = overlap), color = "purple", alpha = 0.5)
   # hmmm 
 
-overlap_area %>% 
-  mutate(overlap = st_cast(overlap, "POLYGON")) %>%
-  group_by(pred, prey) %>% 
-  reframe(overlap_area = st_area(overlap)) %>% 
-  mutate(overlap_area = str_remove(overlap_area, "[m^2]"),
-         overlap_area = parse_number(overlap_area),
-         km_area = (overlap_area*.0000001)) # maybe do this by decade? change in overlap (+/-/0)
+# overlap_area %>% 
+#   mutate(overlap = st_cast(overlap, "POLYGON")) %>%
+#   group_by(pred, prey) %>% 
+#   reframe(overlap_area = st_area(overlap)) %>% 
+#   mutate(overlap_area = str_remove(overlap_area, "[m^2]"),
+#          overlap_area = parse_number(overlap_area),
+#          km_area = (overlap_area*.0000001)) # maybe do this by decade? change in overlap (+/-/0)
 
 ```
+
+At the decadal time scale (1980-2020), we've transformed the intersection calculated via an equirectangular projection to WGS84 - EPSF:4326. This converts the values into familiar latitude and longitude, while still assuming non-spherical geometry. Plotted below are the intersections of prey *Atlantic herring* and predator *Atlantic cod*. My aim is to use the area calculated here, the total intersection, to run Carroll et. al's various overlap metrics.
 
 ```{r}
 #| label: same as above but by decade (yearly values too small)
 #| echo: false
+#| message: false
+#| warning: false
+#| fig-align: center
+#| fig-width: 8
+#| fig-height: 8
 
 clean_survey %>% 
-  filter(comname %in% species_data$comname) %>% 
+  filter(comname %in% species_list$comname & est_year >= 1980) %>% 
   mutate(decade = 10*est_year %/% 10) %>%
   select(decade, comname, decdeg_beglat, decdeg_beglon) %>%
   rename("avg_lon" = "decdeg_beglon",
@@ -344,7 +443,7 @@ clean_survey %>%
   group_by(comname, decade) %>% 
   summarise(geometry = st_combine(geometry)) -> spatial_data
 
-species_data %>% 
+species_list %>% 
   full_join(spatial_data) -> species_data
 
 species_data %>% 
@@ -376,11 +475,18 @@ overlap_area %>%
 
 overlap_area %>%
   filter(pred == "atlantic cod" & prey == "atlantic herring") %>%
+  mutate(overlap = st_transform(overlap, crs = 4326)) %>%
+  # mutate(overlap = st_transform(overlap, crs="+proj=utm +zone=19")) %>%
   ggplot() +
-  geom_sf(aes(geometry = prey_area), color = "lightblue") +
-  geom_sf(aes(geometry = pred_area), color = "red") +
   geom_sf(aes(geometry = overlap), color = "purple", alpha = 0.5) +
-  facet_wrap(~decade)
+  theme_gmri(strip.background = element_rect(fill = "transparent", color = "black", linewidth = 0.6),
+             strip.text = element_text(color = "black"),
+             panel.border = element_rect(color = "black", linetype = 1, linewidth = 0.6)) + 
+  # coord_sf(xlim=c(-84444, 1280115), ylim=c(3955714,5293370), crs="+proj=utm +zone=19") +
+  coord_sf(xlim= c(-64, -78), ylim= c(37, 46), crs = 4326) +
+  scale_x_continuous(breaks = c(-78,-72,-66)) +
+  scale_y_continuous(breaks = c(38, 42, 46)) +
+  facet_wrap(~decade, nrow = 2)
 
 overlap_area %>% 
   filter(!(pred == "smooth dogfish" & prey == "atlantic herring") & !(pred == "bluefish" & prey == "northern sand lance")) %>%
@@ -389,9 +495,6 @@ overlap_area %>%
   reframe(overlap_area = st_area(overlap)) %>% 
   mutate(overlap_area = str_remove(overlap_area, "[m^2]"),
          overlap_area = parse_number(overlap_area),
-         km_area = (overlap_area*.0000001)) -> pred_prey_overlap
-
-
+         km_area = (overlap_area*.0000001)) -> pred_prey_overlap # think this does need to be biomass weighted...
 
 ```
-
