@@ -7,8 +7,9 @@ format:
 editor: visual
 ---
 
-## Changes in fall and spring centers of biomass 
-To narrow down the potential list of species interactions, I'm pulling out a number of species whose distance between their fall and spring centers of biomass have changed significantly (*p value* <= 0.05). This has narrowed our list of 29 predatory species down to 8. Some have increased their distance between centers and some have decreased. We will classify these species with their movement classifications, examine how prey species are moving, and assess whether those patterns are consistent with the previously hypothesized overlap patterns. 
+## Changes in fall and spring centers of biomass
+
+To narrow down the potential list of species interactions, I'm pulling out a number of species whose distance between their fall and spring centers of biomass have changed significantly (*p value* \<= 0.05). This has narrowed our list of 29 predatory species down to 8. Some have increased their distance between centers and some have decreased. We will classify these species with their movement classifications, examine how prey species are moving, and assess whether those patterns are consistent with the previously hypothesized overlap patterns.
 
 ```{r}
 #| label: load libraries and dependencies
@@ -135,7 +136,6 @@ signif_dist <- season_dist %>%
 
 ```
 
-
 ```{r}
 #| label: plots 
 #| echo: false
@@ -169,11 +169,139 @@ maps <- centerBio_lm %>%
       xlab("Longitude") + ylab("Latitude") +
       theme_gmri(strip.background = element_rect(fill = "transparent", color = "black", linewidth = 0.7),
              strip.text = element_text(color = "black"),
-             legend.title = element_text(size = 10, face = "bold"),
-             legend.text = element_text(size = 10),
+             legend.title = element_text(size = 15, face = "bold"),
+             legend.text = element_text(size = 15),
+             plot.title = element_text(size = 15, face = "bold"),
+             axis.title = element_text(size = 12, face = "bold"),
+             axis.text = element_text(size = 12),
              panel.border = element_rect(color = "black", linetype = 1, linewidth = 0.5))
   }))
  
 gridExtra::marrangeGrob(maps$plot, layout_matrix = matrix(1:2, ncol = 1, nrow = 2, byrow= TRUE), top = NULL)
 ```
+
+## Movement and overlap
+
+Previously, we described the [movement patterns](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html) of roughly 40 species caught in the NEFSC Bottom Trawl survey. Plotted below, the eight species demonstrating the strongest change in seasonal center of biomass are classified in this method.
+
+-   **Contract**: *Goosefish*
+
+-   **Lean**: *Scup*, *Thorny skate*, *Winter skate*
+
+-   **March**: *Red hake*, *Silver hake*, *Smooth dogfish*
+
+-   **Expand**: *Spiny dogfish*
+
+```{r}
+#| label: quantiles
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-align: center
+#| fig-width: 13
+
+
+# Calculate and plot 5%, 10%, 25%, 75%, 90%, and 95% biomass-weighed percentiles
+grouped_quantiles <- function(clean_survey, ...){
+  clean_survey %>% 
+    group_by(comname, ...) %>% 
+    summarise(
+      # Un-weighted averages
+      total_biomass   = sum(biomass_kg),
+      avg_biomass     = mean(biomass_kg),
+      avg_lat         = mean(decdeg_beglat),
+      # Weight quantiles
+      `5%`  = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.05, na.rm = T),
+      `10%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.10, na.rm = T), 
+      `25%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.25, na.rm = T),
+      `50%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.50, na.rm = T),
+      `75%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.75, na.rm = T), 
+      `90%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.90, na.rm = T),
+      `95%` = Hmisc::wtd.quantile(decdeg_beglat, weights = biomass_kg, probs = 0.95, na.rm = T),
+      .groups = "drop") %>%
+    mutate(across(where(is.numeric), round, 4))
+}
+
+quantiles <- grouped_quantiles(clean_survey, est_year)
+
+quantiles %>% 
+  filter(comname %in% signif_dist$comname) %>%
+  pivot_longer(cols = 6:12, names_to = "quantile", values_to = "lat") %>%
+  select(comname, est_year, quantile, lat) %>%
+  group_by(comname, quantile) %>%
+  mutate(rollmean = zoo::rollapplyr(lat, width = 5, FUN = mean, align = "center", partial = T)) %>%
+  group_by(comname) %>% 
+  nest() %>% 
+  mutate(plot = map2(data, comname, function(x,y){
+    out <- ggplot(x) +
+      geom_line(aes(x = est_year, y = rollmean, color = quantile), linetype = 2) +
+      geom_smooth(aes(x = est_year, y = rollmean, color = quantile), method = "lm", se = F) +
+      ylab("Latitude") + xlab("Year") + ggtitle(str_to_sentence(comname), subtitle = x$classification) + 
+      scale_color_gmri() +
+      theme_gmri()})) -> lat_plots
+
+gridExtra::marrangeGrob(lat_plots$plot, layout_matrix = matrix(1:2, ncol = 2, nrow = 1, byrow= TRUE), top = NULL)
+```
+
+In our overlap analysis, we've described seven of the eight above species as predators, with silver hake representing prey species, along with alewife, Atlantic herring, longfin squid, and northern sand lance. We compare the trends of species distributions, then describe the expected relationship based on our movement matrix. We will then map the spatial intersection at the decadal time scales to see if hypothesized overlap pattern is consistent with the trawl survey results. It is likely that we will include other environmental variables, such as average depth, sea surface and bottom temperature. 
+
+```{r}
+#| label: overlap
+#| echo: false
+#| message: false
+#| warning: false
+
+load("~/Documents/necc_distributions/overlap.RData")
+# need to grab trends from `movement.qmd`
+
+trends <- read_csv(here("Data", "trends.csv"))
+
+# species_list %>%
+#   left_join(trends) %>%
+#   filter(comname %in% signif_dist$comname | guild == "prey")
+
+overlap_area %>% 
+  filter(pred %in% signif_dist$comname)  %>%  
+  select(decade, pred, prey, overlap) -> overlap
+
+overlap %>% 
+  mutate(overlap = st_transform(overlap, crs = 4326)) %>%
+  group_by(pred, prey) %>% 
+  nest() %>%
+  mutate(map = purrr::pmap(list(data, pred, prey), function(x,y,z){
+    world <- ne_countries(returnclass = "sf")
+    out <- ggplot() +
+      geom_sf(data = world)+
+      geom_sf(data = x, aes(geometry = overlap), color = "#00608A", alpha = 0.5) +
+      coord_sf(xlim = c(-78,-64), ylim = c(35, 47)) + 
+      scale_y_continuous(breaks = c(38, 42, 46)) +
+      scale_x_continuous(breaks = c(-74, -68)) +
+      facet_wrap(~decade, nrow = 1) +
+      ggtitle(str_to_sentence(paste(pred, prey, sep = " + "))) +
+      xlab("Longitude") + ylab("Latitude") +
+      theme_gmri(strip.background = element_rect(fill = "transparent", color = "black", linewidth = 0.7),
+             strip.text = element_text(color = "black"),
+             legend.title = element_text(size = 15, face = "bold"),
+             legend.text = element_text(size = 15),
+             plot.title = element_text(size = 15, face = "bold"),
+             axis.title = element_text(size = 12, face = "bold"),
+             axis.text = element_text(size = 12),
+             panel.border = element_rect(color = "black", linetype = 1, linewidth = 0.5))  
+  })) -> overlap
+
+overlap$map[[12]]
+
+
+# overlap %>% 
+#   group_by(pred) %>%
+#   nest() %>% 
+#   mutate(wrap = map2(data, pred, function(x,y){
+#     list <- x$map
+#     wrap <- patchwork::wrap_plots(list) + patchwork::plot_annotation(title = str_to_sentence(pred))
+#     
+#   })) -> overlap
+# 
+# overlap$wrap[2]
+```
+
 

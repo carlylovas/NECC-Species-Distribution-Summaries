@@ -31,7 +31,7 @@ library(gt)
 species <- read_csv("/Users/clovas/Documents/necc_distributions/Data/speciesList_inNECC.csv") %>%
   rename("comname" = "Species_comnam") %>%
   mutate(comname   = tolower(comname)) %>%
-  filter(NECC == "Y") %>%
+  # filter(NECC == "Y") %>%
   select(comname)
 
 # Load NEFSC Bottom Trawl Survey data ####
@@ -174,7 +174,9 @@ trends %>%
               mutate(distribution = "contract")) %>%
   full_join(trends %>%
               filter(`5%` == "stable"    & `50%` == "northward" & `95%` == "northward"|
-                     `5%` == "northward" & `50%` == "northward" & `95%` == "stable") %>% 
+                     `5%` == "northward" & `50%` == "northward" & `95%` == "stable"|
+                     `5%` == "stable"    & `50%` == "southward" & `95%` == "southward"|
+                     `5%` == "southward" & `50%` == "southward" & `95%` == "stable") %>% 
               mutate(distribution = "lean")) %>%
   full_join(trends %>%
               filter(`5%` == "northward" & `50%` == "stable" & `95%` == "stable" |
@@ -182,6 +184,8 @@ trends %>%
               mutate(distribution = "retract")) %>%
   full_join(trends) %>% 
   arrange(comname) -> trends # figure out what/who is missing 
+
+write_csv(trends, here("Data", "trends.csv"))
  
 trends %>% 
   mutate(comname = str_to_sentence(comname)) %>% 
