@@ -365,7 +365,7 @@ year_center %>%
   geom_smooth(aes(x = est_year, y = avg_lat, color = comname)) +
   scale_color_gmri() +
   guides(color = guide_legend(title = "Common name")) +
-  xlab("Year") + ylab("Biomass weighted center of latitude")
+  xlab("Year") + ylab("Biomass weighted center of latitude") +
   theme_gmri()
   
   
