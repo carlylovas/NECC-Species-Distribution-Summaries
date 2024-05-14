@@ -137,7 +137,7 @@ signif_dist <- season_dist %>%
 ```
 
 ```{r}
-#| label: plots 
+#| label: maps 
 #| echo: false
 #| message: false
 #| warning: false
@@ -154,7 +154,7 @@ maps <- centerBio_lm %>%
   mutate(decade = 10*est_year %/% 10) %>% 
   group_by(comname) %>% 
   nest() %>% 
-  mutate(plot = map(data, function(x,y){
+  mutate(plot = map2(data, comname, function(x,y){
     world <- ne_countries(returnclass = "sf")
     out <- ggplot(data = world) +
       geom_sf()+
@@ -263,13 +263,9 @@ gt(movement_matrix, groupname_col = NULL, rowname_col = "...1") %>%
                      )}))
 
 ```
-
-
-## Scup & Herring Example 
-The map below shows the intersecting centers of biomass in decadal snapshots. We see that Scup and Atlantic herring both exhibit *leaning* distribution patterns and appear to be increasing in overlap. We will need to run a regression analysis to determine if this increase in overlap is statistically significant, supporting our previous hypothesis that predators and prey species exhibiting the same distribution patterns will have an increase in overlap.
-
+The most frequent predator-prey overlap type we see is lean-march, which depending on the initial conditions could results in an increase or decrease of overlap.
 ```{r}
-#| label: overlap
+#| label: trends
 #| echo: false
 #| message: false
 #| warning: false
@@ -298,9 +294,30 @@ overlap_area %>%
   filter(pred %in% signif_dist$comname)  %>%  
   select(decade, pred, prey, overlap) %>%
   left_join(pred_dist) %>%
-  left_join(prey_dist) %>%
-  relocate("pred_dist", .after = "pred") %>%
-  relocate("prey_dist", .after = "prey")-> overlap
+  left_join(prey_dist) -> overlap
+
+overlap %>% 
+  ungroup() %>%
+  select(pred, prey, pred_dist, prey_dist) %>%
+  mutate(pred = str_to_sentence(pred)) %>%
+  distinct() %>%
+  gt(groupname_col = "pred", row_group_as_column = TRUE) %>%
+  tab_stubhead(label = md("**Predator**")) %>%
+  cols_label(pred_dist = md("**Predator movement**"),
+             prey = md("**Prey**"),
+             prey_dist = md("**Prey movement**")) %>% 
+  fmt(columns = everything(), rows = everything(), fns = function(x){str_to_sentence(x)}) 
+
+
+```
+## Scup & Herring Example 
+The map below shows the annual intersections in decadal snapshots. We see that Scup and Atlantic herring both exhibit *leaning* distribution patterns and appear to be increasing in overlap. It's important to note that these intersection points are *not* centers of biomass but survey points in which both species were caught. We will need to run a regression analysis to determine if this increase in overlap is statistically significant, supporting our previous hypothesis that predators and prey species exhibiting the same distribution patterns will have an increase in overlap.
+
+```{r}
+#| label: plots
+#| echo: false
+#| message: false
+#| warning: false
 
 overlap %>% 
   mutate(overlap = st_transform(overlap, crs = 4326)) %>%
@@ -329,4 +346,47 @@ overlap %>%
   })) -> overlap
 
 overlap$map[[12]]
+
+
 ```
+#### Annual center of biomass 
+```{r}
+#| label: scup and herring cob
+#| echo: false
+#| message: false
+#| warning: false
+
+year_center <- grouped_center_bio(clean_survey, est_year)
+
+year_center %>% 
+  filter(comname %in% c("scup", "atlantic herring")) %>%
+  ggplot() +
+  geom_point(aes(x = est_year, y = avg_lat, color = comname)) +
+  geom_smooth(aes(x = est_year, y = avg_lat, color = comname)) +
+  scale_color_gmri() +
+  guides(color = guide_legend(title = "Common name")) +
+  xlab("Year") + ylab("Biomass weighted center of latitude")
+  theme_gmri()
+  
+  
+```
+#### Survey catch
+```{r}
+#| label: scup and herring raw
+#| echo: false
+#| message: false
+#| warning: false
+
+clean_survey %>% 
+  filter(comname %in% c("scup", "atlantic herring")) %>%
+  ggplot() +
+  geom_point(aes(x = est_year, y = decdeg_beglat, color = comname, alpha = biomass_kg)) +
+  scale_color_gmri() +
+  ylim(c(35, 45)) +
+  guides(color = guide_legend(title = "Common name")) +
+  xlab("Year") + ylab("Biomass at latitude") +
+  theme_gmri()
+
+
+```
+It will likely be necessary to plot the quantiles (5th, 50th, and 95th) to properly visualize the overlap over time. 
