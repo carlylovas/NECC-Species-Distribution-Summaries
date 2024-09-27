@@ -11,6 +11,7 @@ This repository supports analysis of the NOAA NMFS Northeast Fisheries Science C
 -   [Movement classifications](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html)
 -   [Overlap metrics](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/overlap.html)
 -   [Seasonal migration](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/seasonal_migration.html)
+-   [Species profiles](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/NECC%20scripts/Updated_Species_Dist.html)
 
 #### Data
 
