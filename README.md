@@ -34,7 +34,7 @@ These analyses have since been updated with the most recent trawl survey data an
 -   [Movement classifications](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html)
 -   [Overlap metrics](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/overlap.html)
 -   [Seasonal migration](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/seasonal_migration.html)
--   [Linear mixed model](https://carly.lovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/trawl_yearday.html)
+-   [Linear mixed model](https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/trawl_yearday.html)
 
 ------------------------------------------------------------------------
 
