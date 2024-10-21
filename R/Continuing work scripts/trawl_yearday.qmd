@@ -1,0 +1,176 @@
+---
+title: "Mixed effects model"
+format: 
+  html:
+    toc: true
+    self-contained: true
+editor: visual
+---
+```{r}
+#| label: load data and dependecies
+#| echo: false
+#| message: false
+#| warning: false
+
+library(here)
+library(tidyverse)
+library(gmRi)
+library(matrixStats)
+library(patchwork)
+library(broom)
+
+species <- read_csv("/Users/clovas/Documents/Decadal_Variability/Data/species_list_final.csv") # more extensive species list
+
+# Load NEFSC Bottom Trawl Survey data ####
+trawl_data <- gmri_survdat_prep(
+  survdat_source ="most recent",
+  box_location ="cloudstorage")
+
+clean_survey  <- trawl_data %>% 
+  filter(est_year >= 1970) %>%
+  mutate(year_day = lubridate::yday(est_towdate)) %>% 
+  distinct(svspp, est_year, survey_area, stratum, tow, id, est_towdate, year_day, season, comname, catchsex, .keep_all = T) %>%
+  group_by(svspp, est_year, survey_area, stratum, tow, id, est_towdate, year_day, season, 
+           avgdepth, surftemp, bottemp, decdeg_beglat, decdeg_beglon, comname, abundance) %>% 
+  # filter(comname %in% species$comname) %>% 
+  summarise(biomass_kg = sum(biomass_kg, na.rm = T), .groups = "drop")
+
+
+```
+## Survey tow year days
+2017 and 2020 omitted.
+```{r}
+#| label: year day
+#| echo: false
+#| message: false
+
+year_day <- clean_survey %>% 
+  select(est_year, season, year_day, id, survey_area) %>% 
+  filter(!est_year %in% c(2017, 2020))
+
+tows <- year_day %>% 
+  group_by(est_year, season) %>% 
+  summarise(
+    min  = min(year_day),
+    max  = max(year_day),
+    mean = mean(year_day),
+    median = median(year_day)
+  ) %>% 
+  pivot_longer(cols = min:median, names_to = "stat", values_to = "value")
+
+
+ggplot(data = tows, aes(x = est_year, y = value, color = stat)) +
+  geom_line() +
+  # geom_point() +
+  facet_wrap(~season, nrow = 2, scales = "free_y") + 
+  # ylim(c(0,365)) +
+  ylab("Year-Day") + xlab("Year") +
+  scale_color_gmri() +
+   theme_gmri(strip.background = element_rect(fill = "transparent", linetype = 1, linewidth = 1, color = "transparent"),
+                 strip.text = element_text(color = "black", hjust = 0)) # -> plot
+
+# ggsave("year_day.png", plot, bg = "white")
+
+```
+## Median year day
+2017 and 2020 omitted.
+```{r}
+#| label: delta median
+#| echo: false
+#| message: false
+#| warning: false
+
+
+year_day %>% 
+  group_by(est_year, season) %>% 
+  summarise(median = median(year_day)) %>% 
+  pivot_wider(names_from = "season", values_from = "median") %>% 
+  mutate(delta_year_day = (Fall-Spring)) -> delta_year_day
+
+tows %>% 
+  filter(stat == "median") %>% 
+  ggplot() + 
+  geom_line(aes(x = est_year, y = value,group = est_year), color = "#535353", alpha = 0.8) +
+  geom_point(aes(x = est_year, y = value, color = season)) +
+  ggtitle("Spring & Fall Median Year Day") +
+  xlab("Year day") + ylab("Year") +
+  scale_color_gmri() +
+  theme_gmri()
+
+ggplot(delta_year_day) +
+  geom_line(aes(x = est_year, y = delta_year_day), color = "#535353", alpha = 0.8) +
+  geom_point(aes(x = est_year, y = delta_year_day)) +
+  scale_color_gmri() +
+  ggtitle("Difference in median year day", subtitle = "Fall-spring") + 
+  ylab("Number of days") + xlab("Year") +
+  ylim(c(NA, 225)) +
+  theme_gmri()
+
+```
+## Linear mixed effects model
+### using Garrison & Link feeding guilds
+```{r}
+#| label: ecodata
+#| echo: false
+#| message: false
+#| warning: false
+
+library(ecodata)
+
+species_groupings <- ecodata::species_groupings # from ecodata
+species_upper <- species %>% summarise(COMNAME = toupper(comname))
+
+garrison_link <- species_groupings %>% 
+  filter(!is.na(Garrison.Link)) %>% 
+  filter(COMNAME %in% species_upper$COMNAME) %>% 
+  arrange(COMNAME) %>%
+  select(COMNAME, Garrison.Link, SizeCat) %>% 
+  distinct()
+
+```
+
+
+```{r}
+#| label: mixed effects model
+#| echo: false
+#| messaage: false
+#| warning: false
+
+library(lme4)
+
+# build data frame with seasonal distance, seasonal year-day difference, species groups and year
+
+seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds"))
+
+seasonal_dist %>% 
+  select(comname, data) %>% 
+  unnest(data) %>% 
+  select(comname, est_year, dist_km) %>% 
+  mutate(COMNAME = toupper(comname)) %>% 
+  left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
+  left_join(garrison_link) %>%
+  filter(!est_year %in% c(2017, 2020)) %>% 
+  mutate(species = paste(str_to_sentence(comname), SizeCat, sep = "-")) %>% # treating species that have different feeding guilds according to size categories as different entities
+  drop_na() %>% 
+  ungroup() %>% 
+  select(!c(COMNAME, SizeCat)) -> lme
+
+
+# lme %>% 
+#   group_by(species) %>% 
+#   nest() %>% 
+#   mutate(mixed_model = map(data, function(x){
+#     lmer(dist_km ~ delta_year_day + est_year*Garrison.Link + (1|est_year) + (1|comname), data = x)})) 
+
+# this doesn't work - trying across species rather than by species
+
+
+#########
+
+
+model <- lmer(dist_km ~ delta_year_day + est_year*Garrison.Link + (1|est_year) + (1|species), data = lme) # using species to differentiate size class
+
+summary(model, correlation = TRUE)
+
+```
+

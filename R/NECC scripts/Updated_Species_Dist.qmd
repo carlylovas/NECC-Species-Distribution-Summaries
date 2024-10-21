@@ -7,7 +7,8 @@ format:
     self-contained: true
 editor: visual
 ---
-Using the most recent bottom trawl survey data from the NEFSC, I've re-run my previous species distribution summaries and updated the changes in seasonal migration analyses. 
+
+Using the most recent bottom trawl survey data from the NEFSC, I've re-run my previous species distribution summaries and updated the changes in seasonal migration analyses.
 
 The figure below depicts the rate of change (slope) of the distance between the spring and fall centroids for 48 species.
 
@@ -60,7 +61,6 @@ center_bio <- function(clean_survey, ...){
       lon_sd          = weightedSd(decdeg_beglon, w = biomass_kg, na.rm = T),
       .groups = "drop")
 }
-
 
 ```
 
@@ -128,19 +128,22 @@ without_season %>%
 # is the difference in spring and fall centers of biomass changing over time?
 seasonal_dist <- with_season %>% 
   unnest(data) %>% 
-  select(comname, est_year, season, avg_lat, avg_lon, avg_depth) %>% # maybe include depth changes later
+  select(comname, est_year, season, avg_lat, avg_lon, avg_depth) %>%
+  # mutate(rollmean_lat = zoo::rollapplyr(avg_lat, width = 5, FUN = mean, align = "center", partial = T),
+  #        rollmean_lon = zoo::rollapplyr(avg_lon, width = 5, FUN = mean, align = "center", partial = T))%>% # maybe include depth changes later
   group_by(comname, est_year ) %>% 
   nest() 
 
 point_dist <- function(df){
   temp <- sf::st_as_sf(df,coords=c("avg_lon","avg_lat"), crs=4326, remove=FALSE)
+  # temp <- sf::st_as_sf(df,coords=c("rollmean_lon","rollmean_lat"), crs=4326, remove=FALSE)
   out  <- sf::st_distance(temp)[1,2]
   return(out)
 }
 
 seasonal_dist %>% 
   mutate(dist    = map_dbl(data, possibly(point_dist, NA)),
-         dist_km = dist/1000) %>% 
+         dist_km = dist/1000)%>% 
   group_by(comname) %>% 
   nest() %>% 
   mutate(count = map_dbl(data, function(x){nrow(x)}), 
@@ -150,6 +153,8 @@ seasonal_dist %>%
   unnest(season_dist) %>% 
   mutate(signif = ifelse(p.value <= 0.05, T, F)) -> seasonal_dist 
 
+# save out 
+write_rds(seasonal_dist, here("Data","seasonal_dist.rds"))
 ```
 
 ```{r}
@@ -196,7 +201,6 @@ seasonal_dist %>%
 
 ```
 
-
 ```{r}
 #| label: dist by species
 #| echo: false
@@ -220,7 +224,6 @@ seasonal_dist %>%
 
 # dist_plot$dist_plot[[1]]
 ```
-
 
 ```{r}
 #| label: maps
@@ -395,7 +398,9 @@ with_season %>%
 
 ```
 
+```{r}
+# remotes::install_github("noaa-edab/ecodata",build_vignettes=TRUE)
+# library(ecodata)
+# ecodata::species_groupings
 
-
-
-
+```
