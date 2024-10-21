@@ -140,6 +140,7 @@ library(lme4)
 
 # build data frame with seasonal distance, seasonal year-day difference, species groups and year
 
+# run first from updated_species_dist.qmd
 seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds"))
 
 seasonal_dist %>% 
@@ -154,7 +155,6 @@ seasonal_dist %>%
   drop_na() %>% 
   ungroup() %>% 
   select(!c(COMNAME, SizeCat)) -> lme
-
 
 # lme %>% 
 #   group_by(species) %>% 

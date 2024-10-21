@@ -352,10 +352,13 @@ display: none;
 </div>
 
 
-<div id="necc-species-distribution-summaries" class="section level1">
-<h1>NECC-Species-Distribution-Summaries</h1>
-<div id="overview" class="section level2">
-<h2>Overview</h2>
+<div id="nutrional-ecology-of-climate-change" class="section level2">
+<h2>Nutrional ecology of climate change</h2>
+<div id="species-distibution-change-seasonal-variability-and-dietary-responses." class="section level3">
+<h3>Species distibution change, seasonal variability, and dietary
+responses.</h3>
+<div id="overview" class="section level4">
+<h4>Overview</h4>
 <p>This repository supports analysis of the NOAA NMFS Northeast
 Fisheries Science Center spring and fall bottom trawl survey data to
 calculate a suite of metrics summarizing the spatial and temporal
@@ -364,12 +367,33 @@ temporal distribution summaries will be used to see if there are
 relationships among changes in spatial distribution and changes in
 marine species diet as part of the NSF funded Nutritional Ecology of
 Climate Change Project with folks from UNH.</p>
+<hr />
 </div>
-<div id="navigating-the-repo" class="section level2">
-<h2>Navigating the Repo</h2>
-<div id="markdowns-containing-recent-predatorprey-overlap-can-be-found-here" class="section level4">
-<h4>Markdowns containing recent predator/prey overlap can be found
-here</h4>
+<div id="data" class="section level4">
+<h4>Data</h4>
+<p>This folder contains the list of fishes included in the NECC study as
+well as the Rds and RData workspace associated with this project.</p>
+<hr />
+</div>
+<div id="r" class="section level4">
+<h4>R</h4>
+<p>Within the folder there are two subfolders entitled
+<strong>NECC</strong> and <strong>Continuing work scripts.</strong></p>
+<p><strong>NECC</strong> contains four R files from late 2021,</p>
+<ul>
+<li><code>helper_funcs.R</code></li>
+<li><code>01_SurveyDataPrep.R</code></li>
+<li><code>02_SpeciesDistAnalysis.R</code></li>
+<li><code>03_Plotting_Mapping.R</code></li>
+</ul>
+<p>These analyses have since been updated with the most recent trawl
+survey data and are summarised in the following markdown:</p>
+<ul>
+<li><a href="https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/NECC%20scripts/Updated_Species_Dist.html">Species
+profiles</a></li>
+</ul>
+<p><strong>Continuing work scripts</strong> contains multiple markdowns
+for predator/prey overlap and seasonal variability analyses.</p>
 <ul>
 <li><a href="https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/movement.html">Movement
 classifications</a></li>
@@ -377,66 +401,17 @@ classifications</a></li>
 metrics</a></li>
 <li><a href="https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/seasonal_migration.html">Seasonal
 migration</a></li>
-<li><a href="https://carlylovas.github.io/NECC-Species-Distribution-Summaries/R/NECC%20scripts/Updated_Species_Dist.html">Species
-profiles</a></li>
+<li><a href="https://carly.lovas.github.io/NECC-Species-Distribution-Summaries/R/Continuing%20work%20scripts/trawl_yearday.html">Linear
+mixed model</a></li>
 </ul>
+<hr />
 </div>
-<div id="data" class="section level4">
-<h4>Data</h4>
-<p>This folder contains the list of fishes included in the NECC study as
-well as the Rds and RData workspace associated with this project.</p>
-</div>
-<div id="r" class="section level4">
-<h4>R</h4>
-<p>This folder contains the prep code for cleaning the survey data
-<code>01_SurveyDataPrep.R</code>, code for the NECC species distribution
-analysis <code>02_SpeciesDistAnalysis</code>, code for plotting
-<code>03_Plotting_Mapping</code>. There are two additional scripts; ,
-<span class="citation">@carlylovas</span>’ workspace
-<code>NECC.R</code>, and <code>helper_funcs.R</code> which contains the
-code for three functions used in this analysis.</p>
-</div>
-<div id="temp_results" class="section level4">
-<h4>Temp_Results</h4>
+<div id="temp-results" class="section level4">
+<h4>Temp Results</h4>
 <p>There are three folders: <strong>Plots</strong>,
 <strong>Maps</strong> and <strong>Tables</strong>. These folders contain
-output results from the above analysis.</p>
-<p><strong>Plots</strong></p>
-<p>There are two subfolders within <strong>Plots</strong>;
-<code>NECC_plots</code> and <code>Decadal_plots</code>.
-<code>NECC_plots</code> contains five plots depicting changes in center
-of latitude, seasonal distance, and rate of change. All are
-appropriately labeled. <code>Decadal_plots</code> contains three
-separate folders to house plots depicting changes in surface
-temperature, bottom temperature, and depth over time.</p>
-<p><strong>Maps</strong></p>
-<p>There is currently one folder within <strong>Maps</strong>.
-<code>NECC_maps</code> show changes in Fall and Spring center of biomass
-for each species <em>per decade</em>.</p>
-<p><strong>Tables</strong></p>
-<p>There are six CSV files within <strong>Tables</strong></p>
-<p><code>NEFSC_YearSeason_Center_of_Biomass.csv</code></p>
-<p>This file contains the year-season center of latitude and longitude
-per species.</p>
-<p><code>NEFSC_Yearly_Center_of_Biomass.csv</code></p>
-<p>This file includes the changes in center of latitude and longtitude
-per species per year.</p>
-<p><code>NEFSC_YearSeason_Rate_of_Change.csv</code></p>
-<p>This file contains the rate of change for center of latitude and
-longitude (<code>slopeLat</code> and <code>slopeLon</code>,
-respectively) per species <em>per season</em>, along with the associated
-signficance values (p.value).</p>
-<p><code>NEFSC_Yearly_Rate_of_Change.csv</code></p>
-<p>This file contains the rate of change for center of latitude and
-longitude (<code>slopeLat</code> and <code>slopeLon</code>,
-respectively) per speices, along with the associated signficance values
-(p.value).</p>
-<p><code>Seasonal_Distance_CofBiomass.csv</code></p>
-<p>This file contains the distance (in km) in which the center of
-biomass moved between spring and fall surveys per species, per year.</p>
-<p><code>Seasonal_Rate_Change.csv</code></p>
-<p>This file contains the rate of which the distance between spring and
-fall center of biomass changed over time, per species.</p>
+output results from former species distibution analyses and have
+<em>not</em> been updated since 2022.</p>
 </div>
 </div>
 </div>
