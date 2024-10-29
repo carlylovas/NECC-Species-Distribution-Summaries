@@ -108,7 +108,7 @@ ggplot(delta_year_day) +
 
 ```
 ## Linear mixed effects model
-### using Garrison & Link feeding guilds
+### SOE 2024 feeding guilds
 ```{r}
 #| label: ecodata
 #| echo: false
@@ -120,57 +120,124 @@ library(ecodata)
 species_groupings <- ecodata::species_groupings # from ecodata
 species_upper <- species %>% summarise(COMNAME = toupper(comname))
 
-garrison_link <- species_groupings %>% 
-  filter(!is.na(Garrison.Link)) %>% 
+# garrison_link <- species_groupings %>% 
+#   filter(!is.na(Garrison.Link)) %>% 
+#   filter(COMNAME %in% species_upper$COMNAME) %>% 
+#   arrange(COMNAME) %>%
+#   select(COMNAME, Garrison.Link, SizeCat) %>% 
+#   distinct()
+
+soe_24 <- species_groupings %>% 
+  select(COMNAME, SOE.24) %>% 
   filter(COMNAME %in% species_upper$COMNAME) %>% 
-  arrange(COMNAME) %>%
-  select(COMNAME, Garrison.Link, SizeCat) %>% 
-  distinct()
+  distinct() 
 
 ```
 
-
+#### Linear mixed effects regression (lmer)
+`dist_km ~ delta_year_day + est_year*SOE_24 + (1|est_year) + (1|comname)`
 ```{r}
-#| label: mixed effects model
+#| label: lme
 #| echo: false
 #| messaage: false
 #| warning: false
 
 library(lme4)
+library(ggeffects)
+library(glmmTMB)
 
 # build data frame with seasonal distance, seasonal year-day difference, species groups and year
 
 # run first from updated_species_dist.qmd
 seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds"))
 
-seasonal_dist %>% 
+lme <- seasonal_dist %>% 
   select(comname, data) %>% 
-  unnest(data) %>% 
+  unnest(data) %>%
+  drop_na() %>% 
   select(comname, est_year, dist_km) %>% 
   mutate(COMNAME = toupper(comname)) %>% 
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
-  left_join(garrison_link) %>%
-  filter(!est_year %in% c(2017, 2020)) %>% 
-  mutate(species = paste(str_to_sentence(comname), SizeCat, sep = "-")) %>% # treating species that have different feeding guilds according to size categories as different entities
+  left_join(soe_24) %>%
+  filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
   drop_na() %>% 
   ungroup() %>% 
-  select(!c(COMNAME, SizeCat)) -> lme
-
-# lme %>% 
-#   group_by(species) %>% 
-#   nest() %>% 
-#   mutate(mixed_model = map(data, function(x){
-#     lmer(dist_km ~ delta_year_day + est_year*Garrison.Link + (1|est_year) + (1|comname), data = x)})) 
-
-# this doesn't work - trying across species rather than by species
-
+  mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
+         year_fac = factor(est_year)) # ensuring that the order of variables is consistent across models 
 
 #########
 
+model_1 <- lmer(dist_km ~ delta_year_day + est_year*SOE_24 + (1|est_year) + (1|comname), data = lme)
 
-model <- lmer(dist_km ~ delta_year_day + est_year*Garrison.Link + (1|est_year) + (1|species), data = lme) # using species to differentiate size class
+# summary(model_1, correlation = TRUE)
 
-summary(model, correlation = TRUE)
+ggpredict(model_1, terms = c("est_year", "SOE_24")) %>% 
+  plot()
+```
+
+#### Generalized linear mixed model using template model builder (glmmTMB)
+`dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), family=Gamma(link="log")`
+```{r}
+#| label: glmmTMB
+#| echo: false
+#| messaage: false
+#| warning: false
+
+model_2 <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
+
+# summary(model_2, correlation = TRUE)
+
+ggpredict(model_2, terms = c("est_year", "SOE_24")) %>% 
+  plot()
+```
+#### Species specific glmm using REML
+`dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"))`
+```{r}
+#| label: species level model
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 9
+#| fig-height: 13
+
+species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = TRUE)
+
+# summary(species_model, correlation = TRUE)
+
+# ggpredict(species_model, terms = c("est_year", "comname")) %>% 
+#   plot(facets = TRUE, color = "bw", n_rows = 12) 
+
+predict_response(species_model, c("est_year", "comname"), collapse_tables = TRUE) -> responses
+
+responses %>% 
+  arrange(group, x) %>% 
+  rename("est_year" = "x") %>% 
+  as_tibble() -> responses
+
+ggplot(responses) +
+  geom_line(aes(x = est_year, y = predicted)) +
+  geom_ribbon(aes(x = est_year, ymin = conf.low, ymax = conf.high), alpha = 0.3) +
+  ggtitle("Predicted values of dist_km") +
+  ylab("dist_km") +
+  facet_wrap(~group, scales = "free_y", ncol = 4)
+```
+## Model diagnositics
+#### Feeding guild glmm
+```{r}
+#| label: glmm diag
+#| echo: false
+#| message: false
+#| warning: false
+
+library(DHARMa)
+
+plot(simulateResiduals(model_2))
+
+car::Anova(model_2)
+
+# effects::allEffects(model_2)
+
+# MuMIn::dredge(model_2)
 
 ```
 
