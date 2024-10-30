@@ -152,6 +152,7 @@ library(glmmTMB)
 seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds"))
 
 lme <- seasonal_dist %>% 
+  #filter(count == "54") %>% 
   select(comname, data) %>% 
   unnest(data) %>%
   drop_na() %>% 
@@ -196,31 +197,55 @@ ggpredict(model_2, terms = c("est_year", "SOE_24")) %>%
 #| label: species level model
 #| echo: false
 #| message: false
-#| warning: false
 #| fig-width: 9
-#| fig-height: 13
+#| fig-height: 9
 
-species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = TRUE)
+library(emmeans)
+
+species_model <- glmmTMB(dist_km ~ 0+delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
 
 # summary(species_model, correlation = TRUE)
+
+# str(confint(species_model, level = 0.95))
+# confint(species_model, level = 0.95)
 
 # ggpredict(species_model, terms = c("est_year", "comname")) %>% 
 #   plot(facets = TRUE, color = "bw", n_rows = 12) 
 
-predict_response(species_model, c("est_year", "comname"), collapse_tables = TRUE) -> responses
+# predict_response(species_model, c("est_year", "comname"), collapse_tables = TRUE) -> responses
+# 
+# responses %>% 
+#   arrange(group, x) %>% 
+#   rename("est_year" = "x") %>% 
+#   as_tibble() -> responses
+# 
+# ggplot(responses) +
+#   geom_line(aes(x = est_year, y = predicted)) +
+#   geom_ribbon(aes(x = est_year, ymin = conf.low, ymax = conf.high), alpha = 0.3) +
+#   ggtitle("Predicted values of dist_km") +
+#   ylab("dist_km") +
+#   facet_wrap(~group, scales = "free_y", ncol = 4)
 
-responses %>% 
-  arrange(group, x) %>% 
-  rename("est_year" = "x") %>% 
-  as_tibble() -> responses
+species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
 
-ggplot(responses) +
-  geom_line(aes(x = est_year, y = predicted)) +
-  geom_ribbon(aes(x = est_year, ymin = conf.low, ymax = conf.high), alpha = 0.3) +
-  ggtitle("Predicted values of dist_km") +
-  ylab("dist_km") +
-  facet_wrap(~group, scales = "free_y", ncol = 4)
+species_trends %>% 
+  left_join(lme %>% select(comname, SOE_24)) -> species_trends
+
+
+ggplot(species_trends) +
+  geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
+  geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE_24)) + 
+  geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend), color = SOE_24), alpha = 0.5) +
+  xlim(c(-0.045, 0.045)) +
+  xlab("slope") + ylab("species") +
+  theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.border = element_rect(linetype = 1, color = "black")) 
+
+
 ```
+
+
 ## Model diagnositics
 #### Feeding guild glmm
 ```{r}
