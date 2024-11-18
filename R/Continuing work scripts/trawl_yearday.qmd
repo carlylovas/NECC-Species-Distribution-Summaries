@@ -1,11 +1,13 @@
 ---
 title: "Mixed effects model"
+subtitle: "Seasonal distance predictor"
 format: 
   html:
     toc: true
     self-contained: true
 editor: visual
 ---
+
 ```{r}
 #| label: load data and dependecies
 #| echo: false
@@ -37,8 +39,11 @@ clean_survey  <- trawl_data %>%
 
 
 ```
+
 ## Survey tow year days
+
 2017 and 2020 omitted.
+
 ```{r}
 #| label: year day
 #| echo: false
@@ -72,8 +77,11 @@ ggplot(data = tows, aes(x = est_year, y = value, color = stat)) +
 # ggsave("year_day.png", plot, bg = "white")
 
 ```
+
 ## Median year day
+
 2017 and 2020 omitted.
+
 ```{r}
 #| label: delta median
 #| echo: false
@@ -107,8 +115,39 @@ ggplot(delta_year_day) +
   theme_gmri()
 
 ```
+
+## Seasonal temperatures by season
+Across all tows, are surveyed spring temperatures in the Mid-Atlantic bight comparable to the surveyed fall temperatures in the Gulf of Maine? 
+```{r}
+#| label: surveyed temps
+#| echo: false
+#| message: false
+#| warning: false
+
+clean_survey %>% 
+  select(est_year, season, surftemp, bottemp, id, survey_area) %>% 
+  ungroup() %>% 
+  filter(survey_area %in% c("GoM", "MAB") & !est_year %in% c(2017, 2020)) %>%
+  mutate(season_area = paste(survey_area, season, sep = "-")) %>% 
+  group_by(est_year, season_area) %>% 
+  summarise(sst = mean(surftemp, na.rm = T),
+         bt  = mean(bottemp,  na.rm = T)) %>% 
+  filter(season_area %in% c("GoM-Fall", "MAB-Spring"))-> survey_temps # maybe do a t-test?  
+
+ggplot(data = survey_temps) + 
+  geom_line(aes(x = est_year, y = sst, color = season_area)) +
+  geom_point(aes(x = est_year, y = sst, color = season_area)) +
+  scale_color_gmri() +
+  xlab("Year") + ylab("Sea surface temp") + ggtitle("Surveyed sea surface temperatures") + 
+  theme_gmri()
+```
+
+
+
 ## Linear mixed effects model
+
 ### SOE 2024 feeding guilds
+
 ```{r}
 #| label: ecodata
 #| echo: false
@@ -135,12 +174,14 @@ soe_24 <- species_groupings %>%
 ```
 
 #### Linear mixed effects regression (lmer)
+
 `dist_km ~ delta_year_day + est_year*SOE_24 + (1|est_year) + (1|comname)`
+
 ```{r}
 #| label: lme
 #| echo: false
-#| messaage: false
 #| warning: false
+#| message: false
 
 library(lme4)
 library(ggeffects)
@@ -177,11 +218,13 @@ ggpredict(model_1, terms = c("est_year", "SOE_24")) %>%
 ```
 
 #### Generalized linear mixed model using template model builder (glmmTMB)
+
 `dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), family=Gamma(link="log")`
+
 ```{r}
 #| label: glmmTMB
 #| echo: false
-#| messaage: false
+#| message: false
 #| warning: false
 
 model_2 <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
@@ -191,8 +234,11 @@ model_2 <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (
 ggpredict(model_2, terms = c("est_year", "SOE_24")) %>% 
   plot()
 ```
+
 #### Species specific glmm using REML
+
 `dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"))`
+
 ```{r}
 #| label: species level model
 #| echo: false
@@ -202,9 +248,9 @@ ggpredict(model_2, terms = c("est_year", "SOE_24")) %>%
 
 library(emmeans)
 
-species_model <- glmmTMB(dist_km ~ 0+delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
+species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
 
-# summary(species_model, correlation = TRUE)
+summary(species_model)
 
 # str(confint(species_model, level = 0.95))
 # confint(species_model, level = 0.95)
@@ -228,9 +274,13 @@ species_model <- glmmTMB(dist_km ~ 0+delta_year_day + est_year*comname + (1|year
 
 species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
 
-species_trends %>% 
-  left_join(lme %>% select(comname, SOE_24)) -> species_trends
 
+species_trends %>% 
+  left_join(lme %>% select(comname, SOE_24)) %>% 
+  distinct() -> species_trends
+
+species_trends %>% 
+  mutate(difference = asymp.UCL-asymp.LCL)
 
 ggplot(species_trends) +
   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
@@ -245,9 +295,10 @@ ggplot(species_trends) +
 
 ```
 
-
 ## Model diagnositics
+
 #### Feeding guild glmm
+
 ```{r}
 #| label: glmm diag
 #| echo: false
@@ -265,4 +316,3 @@ car::Anova(model_2)
 # MuMIn::dredge(model_2)
 
 ```
-
