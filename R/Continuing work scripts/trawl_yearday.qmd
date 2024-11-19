@@ -117,7 +117,9 @@ ggplot(delta_year_day) +
 ```
 
 ## Seasonal temperatures by season
-Across all tows, are surveyed spring temperatures in the Mid-Atlantic bight comparable to the surveyed fall temperatures in the Gulf of Maine? 
+
+Across all tows, are surveyed spring temperatures in the Mid-Atlantic bight comparable to the surveyed fall temperatures in the Gulf of Maine?
+
 ```{r}
 #| label: surveyed temps
 #| echo: false
@@ -135,14 +137,20 @@ clean_survey %>%
   filter(season_area %in% c("GoM-Fall", "MAB-Spring"))-> survey_temps # maybe do a t-test?  
 
 ggplot(data = survey_temps) + 
-  geom_line(aes(x = est_year, y = sst, color = season_area)) +
+  # geom_line(aes(x = est_year, y = sst, color = season_area)) +
   geom_point(aes(x = est_year, y = sst, color = season_area)) +
+  geom_line(aes(x = est_year, y = sst, group = est_year)) +
   scale_color_gmri() +
   xlab("Year") + ylab("Sea surface temp") + ggtitle("Surveyed sea surface temperatures") + 
   theme_gmri()
+
+delta_sst <- survey_temps %>% 
+  select(!bt) %>% 
+  pivot_wider(names_from = "season_area", values_from = "sst") %>% 
+  mutate(delta_sst = abs(`GoM-Fall` - `MAB-Spring`))
+
+
 ```
-
-
 
 ## Linear mixed effects model
 
@@ -200,6 +208,7 @@ lme <- seasonal_dist %>%
   select(comname, est_year, dist_km) %>% 
   mutate(COMNAME = toupper(comname)) %>% 
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
+  left_join(delta_sst %>% select(est_year, delta_sst)) %>% 
   left_join(soe_24) %>%
   filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
   drop_na() %>% 
@@ -250,7 +259,7 @@ library(emmeans)
 
 species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
 
-summary(species_model)
+# summary(species_model)
 
 # str(confint(species_model, level = 0.95))
 # confint(species_model, level = 0.95)
@@ -274,19 +283,18 @@ summary(species_model)
 
 species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
 
-
 species_trends %>% 
   left_join(lme %>% select(comname, SOE_24)) %>% 
   distinct() -> species_trends
 
-species_trends %>% 
-  mutate(difference = asymp.UCL-asymp.LCL)
+# species_trends %>% 
+#   mutate(difference = asymp.UCL-asymp.LCL)
 
 ggplot(species_trends) +
   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
   geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE_24)) + 
   geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend), color = SOE_24), alpha = 0.5) +
-  xlim(c(-0.045, 0.045)) +
+  xlim(c(-0.05, 0.05)) +
   xlab("slope") + ylab("species") +
   theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
@@ -295,9 +303,44 @@ ggplot(species_trends) +
 
 ```
 
-## Model diagnositics
+### Delta SST as predictor
+`dist_km ~ delta_sst + est_year*SOE_24 + (1|year_fac) + (1|comname), family=Gamma(link="log")` whereas delta SST is the difference between fall temperatures in the Gulf of Maine and spring temperatures in the mid-Atlantic bight.
 
-#### Feeding guild glmm
+```{r}
+#| label: delta sst
+#| echo: false
+#| message: false
+#| warning: true
+#| fig-width: 9
+#| fig-height: 9
+
+model_3 <- glmmTMB(dist_km ~ delta_sst + est_year*SOE_24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
+
+# summary(model_3)
+
+ggpredict(model_3, terms = c("est_year", "SOE_24")) %>% 
+  plot()
+
+
+species_model_2 <- glmmTMB(dist_km ~ delta_sst + est_year*comname + (1|year_fac), data = lme, family=Gamma(link="log"), REML = T)
+
+species_trends_2 <- as.data.frame(emtrends(species_model_2, "comname", "est_year")) %>% 
+  left_join(lme %>% select(comname, SOE_24)) %>% 
+  distinct()
+
+ggplot(species_trends_2) +
+  geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
+  geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE_24)) + 
+  geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend), color = SOE_24), alpha = 0.5) +
+  xlim(c(-0.05, 0.05)) +
+  xlab("slope") + ylab("species") +
+  theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.border = element_rect(linetype = 1, color = "black")) 
+
+
+```
+
 
 ```{r}
 #| label: glmm diag
@@ -305,11 +348,11 @@ ggplot(species_trends) +
 #| message: false
 #| warning: false
 
-library(DHARMa)
-
-plot(simulateResiduals(model_2))
-
-car::Anova(model_2)
+# library(DHARMa)
+# 
+# plot(simulateResiduals(model_2))
+# 
+# car::Anova(model_2)
 
 # effects::allEffects(model_2)
 
