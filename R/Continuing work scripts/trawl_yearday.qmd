@@ -311,8 +311,6 @@ ggplot(species_trends) +
 #| echo: false
 #| message: false
 #| warning: true
-#| fig-width: 9
-#| fig-height: 9
 
 model_3 <- glmmTMB(dist_km ~ delta_sst + est_year*SOE_24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
 
@@ -323,6 +321,16 @@ ggpredict(model_3, terms = c("est_year", "SOE_24")) %>%
 
 
 species_model_2 <- glmmTMB(dist_km ~ delta_sst + est_year*comname + (1|year_fac), data = lme, family=Gamma(link="log"), REML = T)
+
+```
+
+```{r}
+#| label: sst trends
+#| echo: false
+#| message: false
+#| warning: true
+#| fig-width: 9
+#| fig-height: 9
 
 species_trends_2 <- as.data.frame(emtrends(species_model_2, "comname", "est_year")) %>% 
   left_join(lme %>% select(comname, SOE_24)) %>% 
@@ -337,7 +345,6 @@ ggplot(species_trends_2) +
   theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
              panel.border = element_rect(linetype = 1, color = "black")) 
-
 
 ```
 
