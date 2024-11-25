@@ -183,6 +183,7 @@ library(glmmTMB)
 
 # run first from updated_species_dist.qmd
 seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds")) %>%
+  filter(count == 53) %>% # only species present in all years (excluding 2020)
   select(comname, data) %>% 
   unnest(data) %>% 
   unnest(data) %>% 
@@ -190,19 +191,11 @@ seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds")) %>%
   filter(n_distinct(season) == 2)  %>%
   ungroup() # Assuming there are 2 seasons in total (Spring, Fall) ungroup()
 
-seasonal_dist %>% 
-  select(comname, est_year) %>% 
-  distinct() %>% 
-  mutate(yearID = est_year-1970 + 1) -> test
-
-# test$est_year[test$comname == "american lobster"] == unique(seasonal_dist$est_year) loop this or function or something
-
-
 lme <- seasonal_dist %>% 
   select(comname, est_year, dist_km) %>% 
   mutate(COMNAME = toupper(comname)) %>% 
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
-  left_join(delta_sst %>% select(est_year, delta_sst)) %>% 
+  # left_join(delta_sst %>% select(est_year, delta_sst)) %>% 
   left_join(soe_24) %>%
   filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
   drop_na() %>% 
@@ -246,6 +239,7 @@ ggpredict(model_2, terms = c("est_year", "SOE_24")) %>%
 #| label: species level model
 #| echo: false
 #| message: false
+#| warning: false
 #| fig-width: 9
 #| fig-height: 9
 

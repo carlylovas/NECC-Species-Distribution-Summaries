@@ -94,6 +94,7 @@ with_season %>%
   pivot_longer(cols = lat:lon, names_to = "variable", values_to = "data") %>% 
   unnest(data) %>% 
   select(comname, variable, estimate, p.value) -> with_season_coeff
+
 ```
 
 ```{r}
@@ -146,6 +147,7 @@ point_dist <- function(df){
 seasonal_dist <- seasonal_dist %>% 
   mutate(dist    = map_dbl(data, possibly(point_dist, NA)),
          dist_km = dist/1000) %>% 
+  filter(!is.na(dist)) %>% 
   group_by(comname) %>% 
   nest() %>% 
   mutate(count = map_dbl(data, function(x){nrow(x)}), 
@@ -155,7 +157,7 @@ seasonal_dist <- seasonal_dist %>%
   unnest(season_dist) %>% 
   mutate(signif = ifelse(p.value <= 0.05, T, F)) 
 
-# save out 
+# save out
 # write_rds(seasonal_dist, here("Data","seasonal_dist.rds"))
 ```
 
