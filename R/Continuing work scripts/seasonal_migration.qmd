@@ -40,6 +40,8 @@ seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds")) %>%
 # trawl year day
 delta_year_day <- read_rds(here("Data","trawl_yearday.rds"))
 
+# linear modz (from movement.qmd)
+mods <- read_rds(here("Data", "quantiles_lm.rds"))
 ```
 
 ```{r}
@@ -110,11 +112,44 @@ soe_24 <- species_groupings %>%
 
 ```
 
+## Assessing changes in seasonal distance based on movement rates of functional groups 
+
+```{r}
+#| label: rates of change
+#| echo: false
+#| message: false
+#| warning: false
+
+planktivores <- mods %>% 
+  left_join(soe_24) %>% 
+  filter(quantile == "50%" & SOE.24 == "Planktivore") %>% 
+  unnest(tidy) %>% 
+  filter(!term == "(Intercept)") %>% 
+  select(comname, season, SOE.24, estimate) %>%
+  pivot_wider(names_from = "season", values_from = "estimate") %>% 
+  mutate(spring_changes = ifelse(`Spring` > `Fall`, T,F))
+
+
+piscivores <- mods %>% 
+  left_join(soe_24) %>% 
+  filter(quantile == "50%" & SOE.24 == "Piscivore") %>% 
+  unnest(tidy) %>% 
+  filter(!term == "(Intercept)") %>% 
+  select(comname, season, SOE.24, estimate) %>%
+  pivot_wider(names_from = "season", values_from = "estimate") %>% 
+  mutate(spring_changes = ifelse(`Spring` > `Fall`, T,F))
+
+# are piscivores able to keep pace with planktivores? 
+# difference of squares...? 
+
+```
+
+
 ## Plotting linear mixed model
 
-We narrowed down the species to those which had a statistically significant difference between their 1970-2009 seasonal distance and their 2010-2023 seasonal distance. Size of the point represents the difference between the two averages; color represents feeding guild;x axis represents magnitude and direction of the modeled changes in seasonal distance. The model is as follows
 
-`dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), REML = T)`
+
+`dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), family = Gamma(link = "log"), REML = T)`
 
 ```{r}
 #| label: mixed model
@@ -128,28 +163,36 @@ library(glmmTMB)
 library(emmeans)
 
 seasonal_dist %>% 
-  filter(comname %in% signif$comname & !est_year == 2017) %>% 
+  # filter(comname %in% signif$comname & !est_year == 2017) %>% 
   left_join(soe_24) %>% 
+  filter(!SOE.24 == "Benthos") %>% 
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>% 
   mutate(year_fac = factor(est_year)) -> lme
 
-species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
+# We narrowed down the species to those which had a statistically significant difference between their 1970-2009 seasonal distance and their 2010-2023 seasonal distance. Size of the point represents the difference between the two averages; color represents feeding guild;x axis represents magnitude and direction of the modeled changes in seasonal distance. The model is as follows
+
+# species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
+
+species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE.24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
+
+ggpredict(species_model, terms = c("est_year", "SOE.24")) %>% 
+  plot()
 
 # summary(species_model)
 
-species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year")) %>% 
-  left_join(soe_24) %>%
-  left_join(signif %>% group_by(comname) %>% summarise(diff = estimate2010to2023-estimate1970to2009))
-
-ggplot(species_trends) +
-  geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
-  geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE.24, size = abs(diff))) + 
-  geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend)), alpha = 0.5) +
-  xlim(c(-0.05, 0.05)) +
-  xlab("slope") + ylab("species") +
-  scale_color_gmri() + 
-  theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
-             panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
-             panel.border = element_rect(linetype = 1, color = "black")) 
+# species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year")) %>% 
+#   left_join(soe_24) %>%
+#   left_join(signif %>% group_by(comname) %>% summarise(diff = estimate2010to2023-estimate1970to2009))
+# 
+# ggplot(species_trends) +
+#   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
+#   geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE.24, size = abs(diff))) + 
+#   geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend)), alpha = 0.5) +
+#   xlim(c(-0.05, 0.05)) +
+#   xlab("slope") + ylab("species") +
+#   scale_color_gmri() + 
+#   theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
+#              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
+#              panel.border = element_rect(linetype = 1, color = "black")) 
 
 ```
