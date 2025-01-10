@@ -10,7 +10,7 @@ editor: visual
 
 Drawing inspiration from Lenoir & Svenning, we aim to characterize general distribution change patterns in species from the NEFSC Bottom Trawl Survey.
 
-![](2014_LenoirandSvenning_RangeShiftReview.jpg){fig-align="center"}
+![](images/2014_LenoirandSvenning_RangeShiftReview.jpg){fig-align="center"}
 
 ```{r}
 #| label: load libraries and dependencies
@@ -80,7 +80,7 @@ grouped_quantiles <- function(clean_survey, ...){
     mutate(across(where(is.numeric), round, 4))
 }
 
-quantiles <- grouped_quantiles(clean_survey, est_year, season)
+quantiles <- grouped_quantiles(clean_survey, est_year , season)
 
 ```
 
@@ -98,39 +98,41 @@ quantiles <- grouped_quantiles(clean_survey, est_year, season)
 
 quantiles %>% 
   pivot_longer(cols = 7:13, names_to = "quantile", values_to = "lat") %>%
-  select(comname, est_year, quantile, season, lat) %>%
+  select(comname, est_year, season, quantile, lat) %>% # season
   filter(quantile %in% c("5%", "50%", "95%")) %>%
-  group_by(comname, quantile, season) %>%
+  group_by(comname, quantile, season) %>% # season
   mutate(rollmean = zoo::rollapplyr(lat, width = 5, FUN = mean, align = "center", partial = T)) %>%
-  group_by(comname, quantile, season) %>%
+  group_by(comname, quantile, season) %>% # season
   nest() %>%
   mutate(mod  = map(data, function(x){lm(est_year ~ rollmean, data = x)}),
          tidy = map(mod, broom::tidy)) -> mods
 
 slopes <- mods %>%
-  select(comname, quantile, season, tidy) %>%
+  select(comname, quantile, tidy, season) %>% # season
   unnest(tidy) %>%
   filter(!term == "(Intercept)") %>%
   rename("slope" = "estimate") %>%
-  select(comname, season, quantile, slope, p.value) %>%
+  select(comname, quantile, slope, p.value, season) %>% # season
   mutate(signif   = ifelse(p.value <= 0.05, "true", "false"),
          movement = ifelse(slope > 0, "+", "-"))
 
+# write_rds(mods, file = here("Data", "quantiles_lm.rds"))
+
 # trends
 slopes %>% 
-  select(comname, season, quantile, signif, movement) %>% 
+  select(comname, quantile, signif, movement, season) %>% # season
   filter(signif == "true" & movement == "+") %>%
   mutate(trend = "northward") %>%
   full_join(slopes %>% 
-              select(comname, season, quantile, signif, movement) %>% 
+              select(comname, quantile, signif, movement, season) %>% # season
               filter(signif == "true" & movement == "-") %>%
               mutate(trend = "southward")) %>%
   full_join(slopes %>% 
-              select(comname, season, quantile, signif, movement) %>% 
+              select(comname, quantile, signif, movement, season) %>% # season
               filter(signif == "false" & movement == "-" | signif == "false" & movement == "+") %>%
               mutate(trend = "stable")) %>%
   arrange(comname, quantile) %>%
-  select(comname, season, quantile, trend) %>%
+  select(comname, quantile, trend, season) %>% # season
   pivot_wider(names_from = "quantile", values_from = "trend") -> trends
   
 
@@ -139,6 +141,31 @@ slopes %>%
 #   gt(groupname_col = NULL) %>% 
 #   tab_spanner(columns = c("5%", "50%", "95%"), label = md("**Percentiles**")) %>%
 #   cols_label(comname = md("**Common name**"))
+
+mods %>%
+  filter(comname %in% c("alewife", "american shad", "atlantic herring", "atlantic mackerel", "blackbelly rosefish", "butterfish", "northern sand lance") & quantile == "50%") %>%
+  select(comname, season, tidy) %>%
+  unnest(tidy) %>%
+  filter(!term == "(Intercept)") %>%
+  mutate(signif = ifelse(p.value < 0.05, T,F)) -> plank_centroids
+
+plank_centroids %>%
+  select(comname, season, estimate) %>%
+  pivot_wider(names_from = "season", values_from = "estimate") %>%
+  mutate(spring_changes = ifelse(`Spring` > `Fall`, T, F)) -> plank_movement
+
+mods %>% # filter out piscivores
+  filter(quantile == "50%") %>%
+  select(comname, season, tidy) %>%
+  unnest(tidy) %>%
+  filter(!term == "(Intercept)") %>%
+  mutate(signif = ifelse(p.value < 0.05, T,F)) -> centroids
+#   
+# centroids %>% 
+#   select(comname, season, estimate) %>% 
+#   pivot_wider(names_from = "season", values_from = "estimate") %>%
+#   mutate(spring_changes = ifelse(`Spring` > `Fall`, T, F)) %>% 
+#   filter(spring_changes == TRUE) -> spring_movers
 
 ```
 
@@ -190,7 +217,7 @@ trends %>%
   full_join(trends) %>% 
   arrange(comname) -> trends # figure out what/who is missing 
 
-write_csv(trends, here("Data", "trends.csv"))
+# write_csv(trends, here("Data", "trends.csv"))
  
 match <- trends %>% 
   select(comname, season, distribution) %>% 
@@ -280,7 +307,6 @@ gridExtra::marrangeGrob(lat_shift$plot, layout_matrix = matrix(1:3, nrow = 3, nc
 
 ```
 
-
 ```{r}
 #| label: quantile movement 
 #| echo: false
@@ -339,6 +365,3 @@ gridExtra::marrangeGrob(lat_shift$plot, layout_matrix = matrix(1:3, nrow = 3, nc
 
 
 ```
-
-
-
