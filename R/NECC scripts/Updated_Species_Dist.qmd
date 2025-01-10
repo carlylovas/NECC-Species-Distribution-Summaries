@@ -236,37 +236,38 @@ seasonal_dist %>%
 #| fig-align: center
 
 with_season %>% 
-  select(comname, data) %>% 
-  mutate(map = map2(data, comname, function(x,y){
-    us <- rnaturalearth::ne_states(country = "united states of america")
-    x  <- x %>% 
-      mutate(decade = 10*est_year %/% 10) 
-    plot <- ggplot() +
-      geom_sf(data = us) +
-      coord_sf(xlim = c(-66,-76), ylim = c(38,48)) +
-      # ggtitle(str_to_sentence(comname)) + 
-      ggtitle("Season center of biomass by decade") +
-      ylab("Latitude") + xlab("Longitude") + 
-      scale_x_continuous(breaks = c(-68, -71, -74)) +
-      scale_y_continuous(breaks = c(38, 43, 48)) +
-      geom_point(data = x, aes(x = avg_lon, y = avg_lat, color = season)) +
-      scale_color_gmri() + 
-      guides(color = guide_legend(title = "Season")) +
-      facet_wrap(~decade, nrow = 1) +
-      theme_gmri(strip.background = element_rect(fill = "transparent", linetype = 1, linewidth = 1, color = "#e9e9e9"),
-                 strip.text = element_text(color = "black"),
-                 # axis.title = element_text(color = "#535353"),
-                 # axis.text = element_text(color = "#535353"),
-                 axis.line = element_line(color = "#e9e9e9"),
-                 axis.ticks = element_line(color = "#e9e9e9"),
-                 plot.title = element_text(size = 12),
-                 panel.border = element_rect(color = "#e9e9e9", linetype = 1, linewidth = 1),
-                 panel.grid.major = element_line(color = "#e9e9e9"))  
-    
-    return(plot)
-  })) -> with_season
+      select(comname, data) %>% 
+      mutate(map = map2(data, comname, function(x,y){
+        us <- rnaturalearth::ne_states(country = "united states of america")
+        x  <- x %>% 
+          mutate(decade = 10*est_year %/% 10) 
+        plot <- ggplot() +
+          geom_sf(data = us) +
+          coord_sf(xlim = c(-66,-76), ylim = c(36,48)) +
+          # ggtitle(str_to_sentence(comname)) + 
+          ggtitle("Season center of biomass by decade") +
+          ylab("Latitude") + xlab("Longitude") + 
+          scale_x_continuous(breaks = c(-68, -71, -74)) +
+          scale_y_continuous(breaks = c(38, 43, 48)) +
+          geom_point(data = x, aes(x = avg_lon, y = avg_lat, color = season)) +
+          scale_color_gmri() + 
+          guides(color = guide_legend(title = "Season")) +
+          facet_wrap(~decade, nrow = 1) +
+          theme_gmri(strip.background = element_rect(fill = "transparent", linetype = 1, linewidth = 1, color = "#e9e9e9"),
+                     strip.text = element_text(color = "black"),
+                     # axis.title = element_text(color = "#535353"),
+                     # axis.text = element_text(color = "#535353"),
+                     axis.line = element_line(color = "#e9e9e9"),
+                     axis.ticks = element_line(color = "#e9e9e9"),
+                     plot.title = element_text(size = 12),
+                     panel.border = element_rect(color = "#e9e9e9", linetype = 1, linewidth = 1),
+                     panel.grid.major = element_line(color = "#e9e9e9"))  
+        
+        return(plot)
+      })) -> with_season
 
-# with_season$map[[1]]
+    bsb_map <- with_season$map[[11]]
+    ggsave("bsb_map.png", bsb_map)
 
 ```
 
@@ -454,3 +455,24 @@ with_season %>%
 
 ```
 
+```{r}
+#| label: heatmap test
+#| echo: false
+
+# with_season %>% 
+#   filter(comname == "alewife") %>% 
+#   mutate(avg_lat = round(avg_lat, digits = 1),
+#          avg_lon = round(avg_lon, digits = 1)) %>% 
+#   group_by(avg_lat, avg_lon, season) %>% 
+#   summarise(avg_biomass = mean(total_biomass)) -> heatmap
+# 
+# ggplot(heatmap) +
+#   geom_tile(aes(x=avg_lon, y = avg_lat, alpha = avg_biomass), fill = "#00608A") +
+#   facet_wrap(~season) +
+#    theme_gmri(panel.grid.major = element_line(color = "#e9e9e9", linetype = 1),
+#               panel.grid.minor = element_line(color = "#e9e9e9", linetype = 1),
+#              axis.line = element_blank(),
+#              axis.text.y = element_text(size = 6)) 
+
+
+```
