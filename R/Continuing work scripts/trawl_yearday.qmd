@@ -94,6 +94,8 @@ year_day %>%
   pivot_wider(names_from = "season", values_from = "median") %>% 
   mutate(delta_year_day = (Fall-Spring)) -> delta_year_day
 
+# saveRDS(delta_year_day, here("Data", "trawl_yearday.rds"))
+
 tows %>% 
   filter(stat == "median") %>% 
   ggplot() + 
@@ -191,6 +193,7 @@ seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds")) %>%
   filter(n_distinct(season) == 2)  %>%
   ungroup() # Assuming there are 2 seasons in total (Spring, Fall) ungroup()
 
+# model dataframe
 lme <- seasonal_dist %>% 
   select(comname, est_year, dist_km) %>% 
   mutate(COMNAME = toupper(comname)) %>% 
@@ -200,7 +203,8 @@ lme <- seasonal_dist %>%
   filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
   drop_na() %>% 
   ungroup() %>% 
-  mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
+  distinct() %>% 
+   mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
          year_fac = factor(est_year)) # ensuring that the order of variables is consistent across models 
 
 #########
@@ -238,8 +242,8 @@ ggpredict(model_2, terms = c("est_year", "SOE_24")) %>%
 ```{r}
 #| label: species level model
 #| echo: false
-#| message: false
-#| warning: false
+#| message: true
+#| warning: true
 #| fig-width: 9
 #| fig-height: 9
 
@@ -247,24 +251,54 @@ library(emmeans)
 
 species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
 
-# summary(species_model)
+summary(species_model)
+summary <- summary(species_model)[["coefficients"]]
+coeff <- as.data.frame(summary[["cond"]]) %>% 
+  rownames_to_column() %>%
+  mutate(signif = ifelse(`Pr(>|z|)` < 0.05, T, F)) %>%
+  filter(rowname %in% c(str_subset(rowname, pattern = "est_year"))) %>%
+  mutate(comname = str_remove(rowname, pattern = "est_year:comname"))
+
+coeff$comname[coeff$rowname == "est_year"] = "acadian redfish"
 
 species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
-trends <- read.csv(here("Data", "trends.csv")) # movement categories
 
-species_trends %>% 
+coeff %>% 
+  mutate(back_corrected = Estimate+(-0.0061029540)) %>% # back correction included
+  left_join(species_trends) -> test 
+
+trends <- read.csv(here("Data", "trends.csv")) %>%
+  select(comname, season, distribution) # %>% 
+  # pivot_wider(names_from = "season", values_from = "distribution") %>% 
+  # mutate(match = ifelse(`Spring` == `Fall`, T,F)) # movement categories
+
+test %>% 
   left_join(lme %>% select(comname, SOE_24)) %>% 
-  left_join(trends %>% select(comname, distribution)) %>% 
+  left_join(trends %>% select(comname, season, distribution)) %>% 
   distinct() -> species_trends
 
-species_trends$distribution[is.na(species_trends$distribution)] = "unclassified"
+# species_trends$distribution[is.na(species_trends$distribution)] = "unclassified"
 
 ggplot(species_trends) +
   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
-  geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = distribution, pch = SOE_24), size = 3) + 
-  geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend)), alpha = 0.5) +
+  geom_point(aes(y = comname, x = est_year.trend, color = SOE_24, group = SOE_24, pch = signif), size = 3) + 
+  # geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = comname, group = SOE_24), alpha = 0.5) +
   xlim(c(-0.05, 0.05)) +
   xlab("slope") + ylab("species") +
+  facet_grid(~SOE_24) +
+  scale_color_gmri() + 
+  theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.border = element_rect(linetype = 1, color = "black")) 
+
+species_trends %>% 
+  filter(SOE_24 == "Planktivore") %>% 
+  ggplot() +
+  geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
+  geom_point(aes(y = comname, x = est_year.trend, color = distribution), size = 3) + 
+  # xlim(c(-0.05, 0.05)) +
+  xlab("slope") + ylab("species") +
+  facet_grid(~season) +
   scale_color_gmri() + 
   theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
@@ -273,21 +307,27 @@ ggplot(species_trends) +
 
 ```
 
-
 ```{r}
-#| label: glmm diag
+#| label: individual species plots
 #| echo: false
 #| message: false
 #| warning: false
-
-# library(DHARMa)
 # 
-# plot(simulateResiduals(model_2))
+# install.packages("parameters")
+# library(parameters)
 # 
-# car::Anova(model_2)
+# species_response <- as.data.frame(predict_response(species_model, terms = c("est_year", "comname")))
+# model_param <- as.data.frame(model_parameters(species_model))
+# 
+# model_param %>% 
+#   filter(Parameter == "est_year" | Parameter %in% Parameter[42:79]) -> slopes
+# # SEs are still really close to each other
+# 
+# 
+# ggplot(species_response) +
+#   geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), alpha = 0.5) +
+#   geom_line(aes(x = x, y = predicted)) +
+#   facet_wrap(~group, scales = "free_y")
 
-# effects::allEffects(model_2)
-
-# MuMIn::dredge(model_2)
 
 ```
