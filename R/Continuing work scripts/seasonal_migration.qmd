@@ -147,8 +147,7 @@ piscivores <- mods %>%
 
 ## Plotting linear mixed model
 
-
-
+### By functional group
 `dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), family = Gamma(link = "log"), REML = T)`
 
 ```{r}
@@ -169,13 +168,9 @@ seasonal_dist %>%
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>% 
   mutate(year_fac = factor(est_year)) -> lme
 
-# We narrowed down the species to those which had a statistically significant difference between their 1970-2009 seasonal distance and their 2010-2023 seasonal distance. Size of the point represents the difference between the two averages; color represents feeding guild;x axis represents magnitude and direction of the modeled changes in seasonal distance. The model is as follows
+model <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE.24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
 
-# species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), family = Gamma(link = "log"), data = lme, REML = T)
-
-species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE.24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
-
-ggpredict(species_model, terms = c("est_year", "SOE.24")) %>% 
+ggpredict(model, terms = c("est_year", "SOE.24")) %>% 
   plot()
 
 # summary(species_model)
@@ -196,3 +191,57 @@ ggpredict(species_model, terms = c("est_year", "SOE.24")) %>%
 #              panel.border = element_rect(linetype = 1, color = "black")) 
 
 ```
+
+### Individual-species response
+```{r}
+#| label: species response
+#| echo: false
+#| message: false
+#| warning: false
+#| 
+# model dataframe
+species_lme <- seasonal_dist %>% 
+  select(comname, est_year, dist_km) %>% 
+  mutate(COMNAME = toupper(comname)) %>% 
+  left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
+  left_join(soe_24) %>%
+  filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
+  drop_na() %>% 
+  ungroup() %>% 
+  distinct() %>% 
+   mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
+         year_fac = factor(est_year)) 
+
+species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), data = species_lme, family=Gamma(link="log"), REML = T)
+
+summary <- summary(species_model)[["coefficients"]]
+coeff <- as.data.frame(summary[["cond"]]) %>% 
+  rownames_to_column() %>%
+  mutate(signif = ifelse(`Pr(>|z|)` < 0.05, T, F)) %>%
+  filter(rowname %in% c(str_subset(rowname, pattern = "est_year"))) %>%
+  mutate(comname = str_remove(rowname, pattern = "est_year:comname"))
+
+coeff$comname[coeff$rowname == "est_year"] = "acadian redfish"
+
+species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
+
+coeff %>% 
+  mutate(back_corrected = Estimate+(coeff$Estimate[[1]])) %>% ## skip the first estimate, somehow...
+  left_join(species_trends) %>% 
+  left_join(soe_24) -> species_responses
+
+## stoopid plot
+ggplot(species_responses) +
+  geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
+  geom_point(aes(y = comname, x = est_year.trend, color = SOE.24), size = 3) + 
+  xlim(c(-0.05, 0.05)) +
+  xlab("slope") + ylab("species") +
+  scale_color_gmri() + 
+  facet_wrap(~SOE.24, nrow = 3, scales = "free_y") +
+  theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
+             panel.border = element_rect(linetype = 1, color = "black")) # almost but can be better dummy
+
+
+```
+
