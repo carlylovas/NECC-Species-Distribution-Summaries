@@ -1,5 +1,6 @@
 ---
 title: "Seasonal migration changes"
+author: "carly lovas"
 format: 
   html:
     toc: true
@@ -111,7 +112,7 @@ soe_24 <- species_groupings %>%
 
 ```
 
-### Assessing changes in seasonal distance based on changes in centers of biomass in spring and fall
+#### Assessing changes in seasonal distance based on changes in centers of biomass in spring and fall
 
 ```{r}
 #| label: rates of change
@@ -213,85 +214,82 @@ patchwork::wrap_plots(plot1, plot2, plot3, plot4, ncol = 2)
 
 ```
 
-
-
 ```{r}
 #| label: characterizing change
 #| echo: false
 #| message: false 
 #| warning: false
 
-#  mods %>% 
-#   filter(quantile == "50%") %>% 
-#   unnest(tidy) %>% 
-#   filter(!term == "(Intercept)") %>% 
-#   select(comname, season, quantile, estimate, p.value) %>% 
-#   mutate(signif   = ifelse(p.value <= 0.05, "true", "false"),
-#          movement = ifelse(estimate > 0, "+", "-")) -> categories # I need something for magnitude... spring > fall or something... 
-# 
-# categories %>% 
-#   filter(signif == "true" & movement == "+") %>%
-#   mutate(trend = "northward") %>%
-#   full_join(categories %>% 
-#               filter(signif == "true" & movement == "-") %>%
-#               mutate(trend = "southward")) %>% 
-#   full_join(categories %>% 
-#               filter(signif == "false" & movement == "-" | signif == "false" & movement == "+") %>%
-#               mutate(trend = "stable")) %>% 
-#   arrange(comname, season) -> categories
-# 
-# magnitude <- categories %>% 
-#   ungroup() %>% 
-#   select(comname, season, estimate) %>% 
-#   pivot_wider(names_from = season, values_from = estimate) %>%
-#   mutate(spring_trends = NA) 
-# 
-# magnitude$spring_trends[magnitude$Spring > magnitude$Fall] = "faster"
-# magnitude$spring_trends[magnitude$Spring < magnitude$Fall] = "slower"
-# magnitude$spring_trends[abs(magnitude$Spring - magnitude$Fall) <= 1] = "similar" 
-# 
-# trends <- categories %>% 
-#   ungroup() %>% 
-#   select(comname, season, trend) %>% 
-#   pivot_wider(names_from = season, values_from = trend) %>%
-#   left_join(magnitude %>% select(comname, spring_trends)) %>% 
-#   mutate(seasonal_dist = NA)
-# 
-# 
-# # common trends
-# 
-# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "stable"] = "stable"
-# trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "similar"] = "stable"
-# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "northward" & trends$spring_trends == "faster"] = "contract"
-# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "southward"] = "expand"
+ mods %>%
+  filter(quantile == "50%") %>%
+  unnest(tidy) %>%
+  filter(!term == "(Intercept)") %>%
+  select(comname, season, quantile, estimate, p.value) %>%
+  mutate(signif   = ifelse(p.value <= 0.05, "true", "false"),
+         movement = ifelse(estimate > 0, "+", "-")) -> categories
+ 
+categories %>%
+  filter(signif == "true" & movement == "+") %>%
+  mutate(trend = "northward") %>%
+  full_join(categories %>%
+              filter(signif == "true" & movement == "-") %>%
+              mutate(trend = "southward")) %>%
+  full_join(categories %>%
+              filter(signif == "false" & movement == "-" | signif == "false" & movement == "+") %>%
+              mutate(trend = "stable")) %>%
+  arrange(comname, season) -> categories
+ 
+magnitude <- categories %>%
+  ungroup() %>%
+  select(comname, season, estimate) %>%
+  pivot_wider(names_from = season, values_from = estimate) %>%
+  mutate(spring_trends = NA)
+
+magnitude$spring_trends[magnitude$Spring > magnitude$Fall] = "faster"
+magnitude$spring_trends[magnitude$Spring < magnitude$Fall] = "slower"
+magnitude$spring_trends[abs(magnitude$Spring - magnitude$Fall) <= 1] = "similar"
+ 
+trends <- categories %>%
+  ungroup() %>%
+  select(comname, season, trend) %>%
+  pivot_wider(names_from = season, values_from = trend) %>%
+  left_join(magnitude %>% select(comname, spring_trends)) %>% 
+  mutate(seasonal_dist = NA)
 
 
-# weird trends
+# trends
+## contract
+trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "northward"] = "contract"
+trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "northward"] = "contract"
+trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "stable"] = "contract"
+trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "faster"] = "contract"
 
-# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "northward" & trends$spring_trends == "faster"] = "contract"
-# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "stable" & trends$spring_trends == "faster"] = "contract"
-# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "southward" & trends$spring_trends == "slower"] = "contract"
-# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "northward"] = "contract"
 
-# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "stable"] = "expand"
-# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "southward"] = "expand"
-# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "northward" & trends$spring_trends == "slower"] = "expand"
-# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "southward" & trends$spring_trends == "faster"] = "expand"
+## march
+trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "northward" & trends$spring_trends == "similar"] = "march"
+trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "southward"& trends$spring_trends == "similar"] = "march"
 
+## expand
+trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "southward"] = "expand"
+trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "slower"] = "expand"
+trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "southward"] = "expand" 
+trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "stable"] = "expand"
+
+## stable
+trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "stable"] = "stable"
 
 ```
 
-
-### Linear mixed model
-
-#### By functional group
-`dist_km ~ delta_year_day + est_year*SOE_24 + (1|year_fac) + (1|comname), family = Gamma(link = "log"), REML = T)`
+#### Linear mixed model
 
 ```{r}
 #| label: mixed model
 #| echo: false
 #| message: false
 #| warning: false
+#| fig-align: left
+#| fig-height: 5
+#| fig-width: 7
 
 library(lme4)
 library(ggeffects)
@@ -307,39 +305,35 @@ seasonal_dist %>%
 
 model <- glmmTMB(dist_km ~ delta_year_day + est_year*SOE.24 + (1|year_fac) + (1|comname), data = lme, family=Gamma(link="log"))
 
-ggpredict(model, terms = c("est_year", "SOE.24")) %>% 
-  plot() # -> plot
+# ggpredict(model, terms = c("est_year", "SOE.24")) %>% 
+#   plot() -> plot
 
-# ggsave("dist_model.png", plot, height = 5, width = 7, units = "in")
+m <- as.data.frame(ggpredict(model, terms = c("est_year", "SOE.24")))
 
-# summary(species_model)
-
-# species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year")) %>% 
-#   left_join(soe_24) %>%
-#   left_join(signif %>% group_by(comname) %>% summarise(diff = estimate2010to2023-estimate1970to2009))
-# 
-# ggplot(species_trends) +
-#   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
-#   geom_point(aes(y = forcats::fct_reorder(comname, est_year.trend), x = est_year.trend, color = SOE.24, size = abs(diff))) + 
-#   geom_segment(aes(x = asymp.LCL, xend = asymp.UCL, y = forcats::fct_reorder(comname, est_year.trend)), alpha = 0.5) +
-#   xlim(c(-0.05, 0.05)) +
-#   xlab("slope") + ylab("species") +
-#   scale_color_gmri() + 
-#   theme_gmri(panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
-#              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
-#              panel.border = element_rect(linetype = 1, color = "black")) 
+ggplot(data = m) +
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.25) +
+  geom_line(aes(x = x, y = predicted, color = group), linewidth = 1) + 
+  scale_color_gmri() + scale_fill_gmri() +
+  ylim(c(50, 470)) +
+  xlab("Year") + ylab("Predicted (dist_km)") +
+  ggtitle("Predicted values of dist_km",
+          subtitle = "dist_km ~ delta_year_day + est_year*SOE_24 +\n(1|year_fac) + (1|comname), family = Gamma(link = `log`), REML = T)") +
+  theme_gmri(plot.subtitle = element_text(size = 8),
+             plot.title = element_text(size = 11),
+             axis.text = element_text(size= 8),
+             axis.title = element_text(size = 10))
+  
 
 ```
 
-### Individual-species response
 ```{r}
 #| label: species response
 #| echo: false
 #| message: false
 #| warning: false
-#| fig-align: center
-#| fig-width: 8.5
-#| fig-height: 11
+#| fig-align: left
+#| fig-width: 5
+#| fig-height: 7
 
 # model dataframe
 species_lme <- seasonal_dist %>% 
@@ -371,8 +365,9 @@ coeff %>%
   mutate(back_corrected = Estimate+(coeff$Estimate[[1]])) %>% ## skip the first estimate, somehow...
   left_join(species_trends) %>% 
   left_join(soe_24) %>% 
-  # left_join(trends) %>% 
-  mutate(comname = str_to_sentence(comname)) -> species_responses
+  left_join(trends) %>% 
+  mutate(comname = str_to_sentence(comname),
+         color = est_year.trend > 0.000) -> species_responses
 
 
 ## stoopid plot
@@ -381,19 +376,60 @@ ggplot(species_responses) +
   # geom_segment(aes(y = fct_reorder(comname, est_year.trend), x = asymp.LCL, xend = asymp.UCL)) +
   geom_segment(aes(y = fct_reorder(comname, est_year.trend), x = (est_year.trend+SE), xend = (est_year.trend-SE))) +
   geom_point(aes(y = fct_reorder(comname, est_year.trend), x = est_year.trend, group = SOE.24), size = 2, alpha = 0.8) + 
-  xlim(c(-0.05, 0.05)) +
+  xlim(c(-0.04, 0.04)) +
   xlab("slope") + ylab("species") +
+  ggtitle("Individual species response", subtitle = "Grouped by functional group") +
   scale_color_gmri() + 
+  # facet_wrap(~seasonal_dist, ncol = 2, nrow = 2, scales = "free_y", strip.position = "right") + 
   facet_wrap(~SOE.24, nrow = 3, scales = "free_y", strip.position = "right") +
-  theme_gmri(# strip.text = element_blank(),
+  theme_gmri(plot.title = element_text(size = 10),
+             plot.subtitle = element_text(size = 8),
+             axis.text = element_text(size = 8),
+             axis.title.y = element_blank(), 
              strip.backgroud.y  = element_rect(fill = "#00608a"),
              strip.background.x = element_blank(),
              panel.grid.major = element_line(linetype = 1, color = "#e9e9e9"),
              panel.grid.minor = element_line(linetype = 1, color = "#e9e9e9"),
-             panel.border = element_rect(linetype = 1, color = "black")) # -> plot # almost but can be better dummy
+             panel.border = element_rect(linetype = 1, color = "black")) # -> plot # I hate this plot 
 
 
 # ggsave("placeholder.png", plot, height = 7, width = 5, units = "in")
 
+```
+
+```{r}
+#| label: idk whats happening
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-align: center
+#| fig-width: 11
+#| fig-height: 8.5
+
+
+mods %>% 
+  filter(quantile == "50%") %>% 
+  select(comname, season, quantile, data) %>% 
+  left_join(trends %>% select(comname, seasonal_dist)) %>% 
+  unnest(data) -> lats
+
+lats %>% 
+  group_by(comname) %>%
+  nest() %>% 
+  mutate(plot = map2(data, comname, function(x,y){
+    ggplot(data = x) +
+      geom_line(aes(x = est_year, y = rollmean, color = season), linewidth = 0.2) +
+      geom_smooth(aes(x = est_year, y = rollmean, color = season), method = "lm") +
+      ggtitle(str_to_sentence(comname), subtitle = str_to_title(x$seasonal_dist)) +
+      scale_color_gmri() +
+      theme_gmri(plot.subtitle = element_text(size = 10))
+  })) -> centers
+
+alewife <- centers$plot[[2]]
+lobster <- centers$plot[[3]]
+winter_skate <- centers$plot[[46]] 
+acadian_redfish <- centers$plot[[1]]
+
+patchwork::wrap_plots(alewife, lobster, winter_skate, acadian_redfish, ncol = 2)
 ```
 
