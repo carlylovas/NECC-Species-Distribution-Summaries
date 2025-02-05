@@ -130,6 +130,10 @@ without_season %>%
 #| message: false
 #| warning: false
 
+## CRS 32619 = degrees
+## CRS 4326 = meters
+
+
 # is the difference in spring and fall centers of biomass changing over time?
 seasonal_dist <- with_season %>% 
   unnest(data) %>% 
@@ -139,24 +143,32 @@ seasonal_dist <- with_season %>%
 
 point_dist <- function(df){
   temp <- sf::st_as_sf(df,coords=c("avg_lon","avg_lat"), crs=4326, remove=FALSE)
-  temp <- sf::st_transform(temp, crs = 32619)
-  out  <- sf::st_distance(temp)[1,2]
+  temp <- sf::st_transform(temp, crs = 4326)
+  out  <- sf::st_distance(temp$geometry)[1,2]
   return(out)
 }
 
+
+# df <- seasonal_dist %>% 
+#   filter(comname == "acadian redfish") %>% 
+#   unnest()
+# 
+# sf::st_crs(temp$geometry)
+
+
 seasonal_dist <- seasonal_dist %>% 
-  mutate(dist    = map_dbl(data, possibly(point_dist, NA)),
-         dist_km = dist/1000) %>% 
-  filter(!is.na(dist)) %>% 
+  mutate(dist_m    = map_dbl(data, possibly(point_dist, NA)), 
+         dist_km = dist_m/1000) %>% 
+  filter(!is.na(dist_m)) %>% 
   group_by(comname) %>% 
   nest() %>% 
   mutate(count = map_dbl(data, function(x){nrow(x)}), 
-         season_dist = map(data, function(x){lm(dist_km ~ est_year, data = x) %>% 
+         season_dist = map(data, function(x){
+           lm(dist_km ~ est_year, data = x) %>% 
                           tidy() %>% 
                           filter(term == "est_year")})) %>% 
   unnest(season_dist) %>% 
   mutate(signif = ifelse(p.value <= 0.05, T, F)) 
-
 # save out
 # write_rds(seasonal_dist, here("Data","seasonal_dist.rds"))
 ```
