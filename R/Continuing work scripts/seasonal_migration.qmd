@@ -338,14 +338,15 @@ ggplot(data = m) +
 # model dataframe
 species_lme <- seasonal_dist %>% 
   select(comname, est_year, dist_km) %>% 
+  distinct() %>% 
   mutate(COMNAME = toupper(comname)) %>% 
   left_join(delta_year_day %>% select(est_year, delta_year_day)) %>%
   left_join(soe_24) %>%
   filter(!est_year %in% c(2017, 2020) & !SOE.24 == "Benthos") %>% 
   drop_na() %>% 
   ungroup() %>% 
-  distinct() %>% 
-   mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
+  mutate(SOE_24 = factor(SOE.24, levels = c("Planktivore", "Benthivore", "Piscivore")),
+         year_index = est_year-min(est_year),
          year_fac = factor(est_year)) 
 
 species_model <- glmmTMB(dist_km ~ delta_year_day + est_year*comname + (1|year_fac), data = species_lme, family=Gamma(link="log"), REML = T)
@@ -363,17 +364,17 @@ species_trends <- as.data.frame(emtrends(species_model, "comname", "est_year"))
 
 coeff %>% 
   mutate(back_corrected = Estimate+(coeff$Estimate[[1]])) %>% ## skip the first estimate, somehow...
-  left_join(species_trends) %>% 
+  left_join(species_trends) %>% # making sure things match
   left_join(soe_24) %>% 
-  left_join(trends) %>% 
+  # left_join(trends) %>% 
   mutate(comname = str_to_sentence(comname),
-         color = est_year.trend > 0.000) -> species_responses
-
+         color = est_year.trend > 0.000,
+         exp = exp(est_year.trend)) -> species_responses
 
 ## stoopid plot
 ggplot(species_responses) +
   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
-  # geom_segment(aes(y = fct_reorder(comname, est_year.trend), x = asymp.LCL, xend = asymp.UCL)) +
+  geom_segment(aes(y = fct_reorder(comname, est_year.trend), x = asymp.LCL, xend = asymp.UCL)) +
   geom_segment(aes(y = fct_reorder(comname, est_year.trend), x = (est_year.trend+SE), xend = (est_year.trend-SE))) +
   geom_point(aes(y = fct_reorder(comname, est_year.trend), x = est_year.trend, group = SOE.24), size = 2, alpha = 0.8) + 
   xlim(c(-0.04, 0.04)) +
@@ -405,7 +406,6 @@ ggplot(species_responses) +
 #| fig-align: center
 #| fig-width: 11
 #| fig-height: 8.5
-
 
 mods %>% 
   filter(quantile == "50%") %>% 
