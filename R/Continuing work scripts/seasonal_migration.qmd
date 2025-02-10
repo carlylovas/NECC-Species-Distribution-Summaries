@@ -22,7 +22,8 @@ library(gmRi)
 library(matrixStats)
 
 # species data
-species <- read_csv("/Users/clovas/Documents/Decadal_Variability/Data/species_list_final.csv") # more extensive species list
+species <- read_csv(here("Data","species_list_2025.csv")) %>% 
+  rename("comname" = "x") %>% select(comname) # more extensive species list
 
 # seasonal distance data
 seasonal_dist <- read_rds(here("Data", "seasonal_dist.rds")) %>%
@@ -433,7 +434,8 @@ ggplot(slopes_output) +
   xlab("slope") + ylab("species") +
   ggtitle("Individual species response", subtitle = "Grouped by functional group") +
   scale_color_gmri() + 
-  facet_wrap(~SOE.24, nrow = 3, scales = "free_y", strip.position = "right") +
+  facet_wrap(~SOE.24, scales = "free_y", nrow = 3, strip.position = "right") +
+  # facet_grid(~SOE.24, scales = "free_y" , space = "free") + # nrow = 3, strip.position = "right") +
   theme_gmri(plot.title = element_text(size = 10),
              plot.subtitle = element_text(size = 8),
              axis.text = element_text(size = 8),
@@ -479,5 +481,20 @@ winter_skate <- centers$plot[[46]]
 acadian_redfish <- centers$plot[[1]]
 
 patchwork::wrap_plots(alewife, lobster, winter_skate, acadian_redfish, ncol = 2)
+```
+
+```{r}
+#| label: reml test
+#| echo: false
+#| message: false
+#| warning: false 
+
+reml_T <- glmmTMB(dist_km ~ delta_year_day + year_index*comname + (1|year_fac), data = species_lme, family=Gamma(link="log"), REML = T)
+reml_F <- glmmTMB(dist_km ~ delta_year_day + year_index*comname + (1|year_fac), data = species_lme, family=Gamma(link="log"), REML = F) #default
+
+# slopes
+slopes_reml_T <- slopes(reml_T, variables = "year_index", by = "comname", type = "response")
+slopes_reml_F <- slopes(reml_F, variables = "year_index", by = "comname", type = "response")
+
 ```
 
