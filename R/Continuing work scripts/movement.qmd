@@ -36,7 +36,6 @@ library(gt)
 
 species <- read_csv("/Users/clovas/Documents/Decadal_Variability/Data/species_list_final.csv") # more extensive species list
 
-
 # Load NEFSC Bottom Trawl Survey data ####
 trawl_data <- gmri_survdat_prep(
   survdat_source ="most recent",

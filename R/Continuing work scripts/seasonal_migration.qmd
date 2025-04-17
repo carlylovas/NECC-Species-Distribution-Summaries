@@ -239,45 +239,104 @@ categories %>%
               filter(signif == "false" & movement == "-" | signif == "false" & movement == "+") %>%
               mutate(trend = "stable")) %>%
   arrange(comname, season) -> categories
- 
-magnitude <- categories %>%
+```
+
+```{r}
+#| label: categories
+#| echo: false
+#| message: false
+categories %>%
   ungroup() %>%
-  select(comname, season, estimate) %>%
+  select(comname, season, estimate) %>% 
   pivot_wider(names_from = season, values_from = estimate) %>%
-  mutate(spring_trends = NA)
+  group_by(comname) %>% 
+  summarise(difference = `Fall`-`Spring`) %>% 
+  left_join(categories %>% ungroup() %>% select(comname, season, signif)) %>% 
+  pivot_wider(names_from = season, values_from = signif) -> df
 
-magnitude$spring_trends[magnitude$Spring > magnitude$Fall] = "faster"
-magnitude$spring_trends[magnitude$Spring < magnitude$Fall] = "slower"
-magnitude$spring_trends[abs(magnitude$Spring - magnitude$Fall) <= 1] = "similar"
- 
-trends <- categories %>%
+# movement categories
+
+## contracting
+### fall = ~0, spring > 0, fall-spring < 0
+df %>% 
+  filter(Fall == "false" & Spring == "true" & difference < 0) %>% 
+  select(comname) %>% 
+  mutate(category = "contracting") -> contracting 
+
+## marching
+### fall > 0 < spring & 0 > fall-spring < 1
+df %>% 
+  filter(Fall == "true" & Spring == "true" & abs(difference) < 10) %>% # figure out this threshold
+  select(comname) %>% 
+  mutate(category = "marching")-> marching 
+
+## expanding
+### fall-spring > 0 & fall > 0 > spring
+categories %>%
   ungroup() %>%
-  select(comname, season, trend) %>%
-  pivot_wider(names_from = season, values_from = trend) %>%
-  left_join(magnitude %>% select(comname, spring_trends)) %>% 
-  mutate(seasonal_dist = NA)
+  select(comname, season, estimate) %>% 
+  pivot_wider(names_from = season, values_from = estimate) %>% 
+  filter(Fall > 0 & Spring < 0) %>% 
+  select(comname) %>% 
+  left_join(df) %>%
+  filter(!Fall == "false" |!Spring == "false") %>% 
+  select(comname) %>% 
+  mutate(category = "expanding") -> expanding
+
+## stable 
+df %>% 
+  filter(Fall == "false" & Spring == "false") %>%
+  select(comname) %>% 
+  mutate(category = "stable") -> stable
 
 
+trends <- contracting %>%
+  full_join(marching) %>%
+  full_join(expanding) %>% 
+  full_join(stable) 
+
+```
+
+```{r}
+#| label: skip this
+#| echo: false
+
+# magnitude <- categories %>%
+#   ungroup() %>%
+#   select(comname, season, estimate) %>%
+#   pivot_wider(names_from = season, values_from = estimate) %>%
+#   mutate(spring_trends = NA)
+# 
+# magnitude$spring_trends[magnitude$Spring > magnitude$Fall] = "faster"
+# magnitude$spring_trends[magnitude$Spring < magnitude$Fall] = "slower"
+# magnitude$spring_trends[abs(magnitude$Spring - magnitude$Fall) <= 1] = "similar"
+#  
+# trends <- categories %>%
+#   ungroup() %>%
+#   select(comname, season, trend) %>%
+#   pivot_wider(names_from = season, values_from = trend) %>%
+#   # left_join(magnitude %>% select(comname, spring_trends)) %>% 
+#   mutate(seasonal_dist = NA)
 # trends
 ## contract
-trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "northward"] = "contract"
-trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "northward"] = "contract"
-trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "stable"] = "contract"
-trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "faster"] = "contract"
-
-
-## march
-trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "northward" & trends$spring_trends == "similar"] = "march"
-trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "southward"& trends$spring_trends == "similar"] = "march"
-
-## expand
-trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "southward"] = "expand"
-trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "slower"] = "expand"
-trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "southward"] = "expand" 
-trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "stable"] = "expand"
-
-## stable
-trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "stable"] = "stable"
+# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "northward"] = "contract"
+# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "northward"] = "contract"
+# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "stable"] = "contract"
+# trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "faster"] = "contract"
+# 
+# 
+# ## march
+# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "northward" & trends$spring_trends == "similar"] = "march"
+# trends$seasonal_dist[trends$Fall == "southward" & trends$Spring == "southward"& trends$spring_trends == "similar"] = "march"
+# 
+# ## expand
+# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "southward"] = "expand"
+# trends$seasonal_dist[trends$Fall == trends$Spring & trends$spring_trends == "slower"] = "expand"
+# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "southward"] = "expand" 
+# trends$seasonal_dist[trends$Fall == "northward" & trends$Spring == "stable"] = "expand"
+# 
+# ## stable
+# trends$seasonal_dist[trends$Fall == "stable" & trends$Spring == "stable"] = "stable"
 
 ```
 
@@ -367,7 +426,7 @@ coeff %>%
   mutate(back_corrected = Estimate+(coeff$Estimate[[1]])) %>% ## skip the first estimate, somehow...
   left_join(species_trends) %>% # making sure things match
   left_join(soe_24) %>% 
-  # left_join(trends) %>% 
+  left_join(trends) %>% 
   mutate(comname = str_to_sentence(comname),
          color = est_year.trend > 0.000,
          exp = exp(est_year.trend)) -> species_responses
@@ -425,12 +484,13 @@ spp_group<- species_responses |>
   mutate(comname = str_to_lower(comname)) |>
   distinct()
 slopes_output<- data.frame(slopes_output) |>
-  left_join(spp_group)
+  left_join(spp_group) |>
+  left_join(trends)
 
 ggplot(slopes_output) +
   geom_vline(xintercept = 0.0, color = "#535353", alpha = 0.7) +
   geom_segment(aes(y = fct_reorder(comname, estimate), x = 0, xend = estimate)) +
-  geom_point(aes(y = fct_reorder(comname,estimate), x = estimate, group = SOE.24), size = 2, alpha = 0.8) + 
+  geom_point(aes(y = fct_reorder(comname,estimate), x = estimate, group = SOE.24, color = category), size = 2, alpha = 0.8) + 
   xlab("slope") + ylab("species") +
   ggtitle("Individual species response", subtitle = "Grouped by functional group") +
   scale_color_gmri() + 
@@ -497,4 +557,3 @@ slopes_reml_T <- slopes(reml_T, variables = "year_index", by = "comname", type =
 slopes_reml_F <- slopes(reml_F, variables = "year_index", by = "comname", type = "response")
 
 ```
-
