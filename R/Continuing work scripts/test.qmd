@@ -1,0 +1,124 @@
+---
+title: "Untitled"
+format: html
+server: shiny
+---
+
+
+```{r}
+#| context: setup
+library(shiny)
+library(bslib)
+library(ggplot2)
+library(rmarkdown)
+library(dplyr)
+
+# Create sample data for different animals
+set.seed(123)
+animals <- c("Dog", "Cat", "Bird", "Fish", "Rabbit")
+
+# Generate sample data for each animal
+animal_data <- lapply(animals, function(animal) {
+  n <- 100
+  data.frame(
+    animal = animal,
+    weight = rnorm(n, 
+                  mean = switch(animal,
+                         "Dog" = 25,
+                         "Cat" = 10,
+                         "Bird" = 0.5,
+                         "Fish" = 0.2,
+                         "Rabbit" = 5),
+                  sd = switch(animal,
+                         "Dog" = 5,
+                         "Cat" = 2,
+                         "Bird" = 0.1,
+                         "Fish" = 0.05,
+                         "Rabbit" = 1)),
+    height = rnorm(n, 
+                  mean = switch(animal,
+                         "Dog" = 50,
+                         "Cat" = 30,
+                         "Bird" = 15,
+                         "Fish" = 10,
+                         "Rabbit" = 20),
+                  sd = switch(animal,
+                         "Dog" = 10,
+                         "Cat" = 5,
+                         "Bird" = 3,
+                         "Fish" = 2,
+                         "Rabbit" = 4)),
+    age = sample(1:15, n, replace = TRUE),
+    health_score = runif(n, 70, 100)
+  )
+}) %>% bind_rows()
+```
+
+```{r}
+#| panel: sidebar
+#| title: Controls
+selectInput("animal", "Select Animal:", choices = animals)
+```
+
+```{r}
+#| panel: fill
+#| layout: [[1,1], [1], [1]]
+
+plotOutput("weightPlot")
+plotOutput("scatterPlot")
+plotOutput("agePlot")
+plotOutput("healthPlot")
+```
+
+```{r}
+#| context: server
+
+# Filter data based on animal selection
+filtered_data <- reactive({
+  animal_data %>%
+    filter(animal == input$animal)
+})
+
+# Weight distribution plot
+output$weightPlot <- renderPlot({
+  ggplot(filtered_data(), aes(x = weight)) +
+    geom_histogram(fill = "steelblue", color = "white", bins = 20) +
+    labs(title = paste(input$animal, "Weight Distribution"),
+         x = "Weight (kg)",
+         y = "Count") +
+    theme_minimal()
+})
+
+# Scatter plot of height vs weight
+output$scatterPlot <- renderPlot({
+  ggplot(filtered_data(), aes(x = weight, y = height)) +
+    geom_point(color = "darkred", alpha = 0.7) +
+    geom_smooth(method = "lm", se = FALSE, color = "blue") +
+    labs(title = paste(input$animal, "Height vs Weight"),
+         x = "Weight (kg)",
+         y = "Height (cm)") +
+    theme_minimal()
+})
+
+# Age distribution plot
+output$agePlot <- renderPlot({
+  ggplot(filtered_data(), aes(x = age)) +
+    geom_bar(fill = "seagreen") +
+    labs(title = paste(input$animal, "Age Distribution"),
+         x = "Age (years)",
+         y = "Count") +
+    theme_minimal()
+})
+
+# Health score by age
+output$healthPlot <- renderPlot({
+  ggplot(filtered_data(), aes(x = age, y = health_score)) +
+    geom_jitter(aes(color = health_score), width = 0.2, height = 0, alpha = 0.7) +
+    scale_color_gradient(low = "orange", high = "green") +
+    labs(title = paste(input$animal, "Health Score by Age"),
+         x = "Age (years)",
+         y = "Health Score") +
+    theme_minimal()
+})
+```
+
